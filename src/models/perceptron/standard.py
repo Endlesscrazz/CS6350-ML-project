@@ -28,14 +28,16 @@ class Perceptron:
             
             current_lr = self.lr/(1 + self.t) if self.decay_lr else self.lr
             shuffled_indices = np.random.permutation(num_examples)
-
+            errors = 0
             for i in shuffled_indices:
                 score = np.dot(self.w, x[i]) + self.b
 
                 if y[i] * score < 0:
                     self.w += current_lr * y[i] * x[i]
                     self.b += current_lr * y[i]
+                    errors += 1
 
+            #print(f"Epoch {epoch +1}: erros={errors}, weight_norm = {np.linalg.norm(self.w):.4f}")
             self.t += 1
     
     def predict(self, x) -> list:

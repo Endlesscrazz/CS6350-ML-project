@@ -127,3 +127,18 @@ def predict(tree, X):
     """
 
     return np.array([predict_sample(tree, sample)for sample in X])
+
+class DecisionTree:
+    def __init__(self, max_depth=5, min_samples_split=2):
+
+        self.max_depth = max_depth
+        self.min_samples_split = min_samples_split
+        self.tree = None
+
+    def train(self, X, y):
+
+        self.tree = build_tree(X, y, max_depth=self.max_depth, min_samples_split=self.min_samples_split)
+    
+    def predict(self, X):
+
+        return predict(self.tree, X)

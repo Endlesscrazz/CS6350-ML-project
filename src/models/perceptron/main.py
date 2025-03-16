@@ -18,6 +18,18 @@ def convert_labels(y):
     """
     return np.where(y ==0, -1, 1)
 
+def train_val_split(X, y, test_size = 0.2, random_state = 42):
+    """
+    Function to split X and y into training and validation sets
+    """
+    np.random.seed(random_state)
+    indices = np.arange(len(y))
+    np.random.shuffle(indices)
+    split = int(len(y) * (1 - test_size))
+    train_idx = indices[:split]
+    val_idx = indices[split:]
+    return X[train_idx], X[val_idx], y[train_idx], y[val_idx]
+
 def build_and_train_perceptron(X_train, y_train, hyperparams, algo):
     """
     Builds and trains a perceptron model based on the specified variant.
@@ -55,35 +67,58 @@ def main():
     parser.add_argument('--epochs', type=int, default=10, help="Number of training epochs.")
     parser.add_argument('--lr', type=float, default=1.0, help="Learning rate (for standard and averaged perceptron).")
     parser.add_argument('--mu', type=float, default=1.0, help="Margin parameter (for margin perceptron, or optionally standard if used).")
+    parser.add_argument('--decay_lr', type=bool, default=False, help="decay learning rate parameter ")
     args = parser.parse_args()
 
-    X_train, y_train = load_data("data/train.csv", label_column="label")
+    X_train_full, y_train_full = load_data("data/train.csv", label_column="label")
     X_test, y_test = load_data("data/test.csv", label_column="label")
 
     #For perceptron
-    y_train_conv = convert_labels(y_train)
+    y_train_full_conv = convert_labels(y_train_full)
     y_test_conv = convert_labels(y_test)
 
-    best_params = {"epochs": args.epochs, "lr": args.lr}
+    #Splitting data into training and evaluation set
+    X_train, X_val, y_train, y_val = train_val_split(X_train_full, y_train_full_conv, test_size=0.2)
+    print(f"Training set size: {X_train.shape[0]}, Validation set size: {X_val.shape[0]}")
+
+    #set hyperparameters
+    hyperparams = {"epochs": args.epochs, "lr": args.lr}
     if args.algo == 'perc':
-        best_params["decay_lr"] = False
-        best_params["mu"] = 0
+        hyperparams["decay_lr"] = False
+        hyperparams["mu"] = 0
     elif args.algo == 'marginperc':
-        best_params["mu"] = args.mu
+        hyperparams["mu"] = args.mu
     
     #Training the model
-    model = build_and_train_perceptron(X_train, y_train, best_params, args.algo)
-    
-    #Predictions
-    train_preds = model.predict(X_train)
-    test_preds = model.predict(X_test)
+    model = build_and_train_perceptron(X_train, y_train, hyperparams, args.algo)
+
+    #Evaluation on held-out validation set
+    val_preds = np.array(model.predict(X_val))
+
+    #Converting predictions from {-1,1} to {0,1} for evaluation
+    val_preds_conv = np.where(val_preds == -1, 0, 1)
+
+    y_val_conv = np.where(y_val == -1, 0, y_val)
+
+    val_prec, val_rec, val_f1 = compute_metrics(y_val_conv, val_preds_conv)
+    print("Held-Out Validation Metrics:")
+    print(f"Precision: {val_prec:.3f}, Recall: {val_rec:.3f}, F1-score: {val_f1:.3f}")
+
+
+    #Retraining on full trainind data and evalating on test set
+    model_full = build_and_train_perceptron(X_train_full, y_train_full_conv, hyperparams, args.algo)
+    train_preds = np.array(model_full.predict(X_train_full))
+    test_preds = np.array(model_full.predict(X_test))
+    #print("Unique training predictions after full training:", np.unique(train_preds))
 
     #Evaluation
     train_preds_conv = np.where(np.array(train_preds) == -1, 0, 1)
     test_preds_conv = np.where(np.array(test_preds) == -1, 0, 1)
+    # print("Unique converted training predictions:", np.unique(train_preds_conv))
+    # print("Unique converted test predictions:", np.unique(test_preds_conv))
 
-    train_prec, train_rec, train_f1 = compute_metrics(y_train, train_preds_conv)
-    print("Training Metrics:")
+    train_prec, train_rec, train_f1 = compute_metrics(y_train_full, train_preds_conv)
+    print("Final Training Metrics:")
     print(f"Precision: {train_prec:.3f}, Recall: {train_rec:.3f}, F1-score: {train_f1:.3f}")
 
     if y_test is not None:
