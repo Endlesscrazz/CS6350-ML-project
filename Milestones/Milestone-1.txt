@@ -1,0 +1,46 @@
+Machine Learning Project Report
+
+Overview:
+For this project, the primary task is to detect malicious Android applications using system call fingerprints. My initial model used a decision tree, and subsequent efforts will incorporate advanced preprocessing and additional models.
+
+Current Model & Results:
+
+Model: Decision Tree
+
+	Hyperparameters:
+		Maximum Depth = 15
+		Minimum Samples Split = 2
+
+Evaluation Metrics (Test Set):
+Precision: 0.823
+Recall: 0.837
+F1-score: 0.820
+
+Kaggle Score: 0.84
+
+These results indicate that the decision tree model, configured with the tuned hyperparameters, performs well on the test set. The relatively high F1-score (0.84 on Kaggle) suggests that the model is effective at balancing precision and recall for this classification task.
+
+Next Steps:
+
+Data Preprocessing Enhancements:
+
+Normalization/Standardization:
+	In future iterations, I will apply normalization (zero mean, unit variance) to the feature set. This step is critical because it ensures that all features contribute equally to the model’s predictions, especially for models like the perceptron that are sensitive to the scale of input data.
+
+Feature Engineering:
+I will explore techniques for feature selection and extraction (e.g., PCA) to reduce noise and redundancy(since multiple rows have just 0 and don't contribute much on feature level for the model training), potentially improving model performance and generalization.
+
+Expansion of Model Portfolio:
+
+Perceptron Models:
+	I plan to implement various perceptron variants (standard, averaged, margin) to assess their performance relative to the decision tree. Given that linear models can sometimes capture different aspects of the data, this will provide an interesting comparison.
+
+Ensemble Methods:
+	To boost robustness, we aim to experiment with ensemble techniques that combine predictions from multiple models (e.g., ensembles of perceptrons and decision trees). Ensembles often improve performance by mitigating the weaknesses of individual models.
+
+Other Models:
+	As part of our future work, I intend to integrate additional machine learning models—including neural networks—to further enhance classification accuracy.
+
+Conclusion:
+	The decision tree model, tuned with a maximum depth of 15 and a minimum sample split of 2, has produced promising results with an F1-score of 0.82 on our test set and a Kaggle score of 0.84. The next phase of this project will focus on robust data preprocessing and expanding the model set. By integrating normalization, feature engineering, and additional model architectures (including various perceptron variants and ensemble methods), I aim to further improve detection performance and generalization.
+
