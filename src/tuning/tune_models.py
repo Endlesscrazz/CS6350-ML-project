@@ -8,6 +8,7 @@ sys.path.append(str(project_src))
 
 from common.data_loader import load_data
 from common.cross_validation import grid_search_cv_generic
+from common.preprocessing import standardize_train,log_transform
 from models.decision_tree.builders import build_model_decision_tree
 from models.perceptron.builders import build_standard_perceptron, build_averaged_perceptron, build_margin_perceptron
 
@@ -29,6 +30,10 @@ def main():
     
     # Load training data
     X_train, y_train = load_data("data/train.csv", label_column="label")
+
+    #Precrossing data
+    X_train = log_transform(X_train)
+    X_train, train_mean, train_std = standardize_train(X_train)
     
     # For perceptron, convert labels to {-1, +1}
     if args.model in ['perc', 'avgperc', 'marginperc']:
@@ -47,14 +52,14 @@ def main():
         # Example grid for a decision tree:
         hyperparam_grid = [
             {"max_depth": d, "min_samples_split": s}
-            for d in [5, 10, 15]
+            for d in [5, 10]
             for s in [2, 5, 10]
         ]
     elif args.model == 'perc':
         # Example grid for a standard perceptron:
         hyperparam_grid = [
             {"epochs": e, "lr": lr, "decay_lr": decay, "mu": 0}
-            for e in [5, 10, 15]
+            for e in [10, 20, 30]
             for lr in [0.1, 0.5, 1.0]
             for decay in [False, True]
         ]
@@ -62,14 +67,14 @@ def main():
 
         hyperparam_grid = [
             {"epochs": e, "lr": lr}
-            for e in [5, 10, 15]
+            for e in [10, 20, 30]
             for lr in [0.1, 0.5, 1.0]
         ]
     elif args.model == 'marginperc':
 
         hyperparam_grid = [
             {"epochs": e, "lr": lr, "mu":mu}
-            for e in [5, 10, 15]
+            for e in [10, 20, 30]
             for lr in [0.1, 0.5, 1.0]
             for mu in [0.8, 1.0, 1.2]
         ]

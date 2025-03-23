@@ -1,20 +1,21 @@
 import numpy as np
 
 class MarginPerceptron:
-    def __init__(self, num_features, mu= 0):
+    def __init__(self, num_features,lr, mu=0):
         """
         Constructor to initalize a new perceptron 
         """
 
         self.num_features = num_features
         self.mu = mu
+        self.lr = lr
         self.t = 0
 
         self.w = np.random.uniform(-0.01,0.01, size=num_features)
         self.b = np.random.uniform(-0.01, 0.01)
 
     def get_hyperparams(self) -> dict:
-        return {'mu': self.mu}
+        return {'lr': self.lr, 'mu': self.mu}
 
     def train(self, x:np.ndarray, y: np.ndarray, epochs: int):
         """
@@ -32,8 +33,8 @@ class MarginPerceptron:
                 if y[i] * score < self.mu:
 
                     step_size = (self.mu - y[i] * score) / (np.dot(x[i], x[i]) + 1)
-                    self.w += step_size * y[i] * x[i]
-                    self.b += step_size * y[i]
+                    self.w += self.lr * step_size * y[i] * x[i]
+                    self.b += self.lr * step_size * y[i]
                     errors += 1
 
             #print(f"Epoch {epoch +1}: erros={errors}, weight_norm = {np.linalg.norm(self.w):.4f}")

@@ -8,9 +8,9 @@ sys.path.append(str(project_root))
 
 from common.data_loader import load_data
 from common.evaluation import compute_metrics
-from common.cross_validation import grid_search_cv_generic, cross_validations_generic
+from common.preprocessing import standardize_train, standardize_test, log_transform
 
-from models.perceptron import Perceptron
+from models.perceptron import Perceptron, AveragedPerceptron, MarginPerceptron
 
 def convert_labels(y):
     """
@@ -49,11 +49,12 @@ def build_and_train_perceptron(X_train, y_train, hyperparams, algo):
         decay_lr = hyperparams.get("decay_lr", False)
         mu = hyperparams.get("mu", 0)
         model = Perceptron(num_features=X_train.shape[1], lr=lr, decay_lr=decay_lr, mu=mu)
-    # elif algo == 'avgperc':
-    #     model = AveragedPerceptron(num_features=X_train.shape[1], lr=lr)
-    # elif algo == 'marginperc':
-    #     mu = hyperparams.get("mu", 1.0)
-    #     model = MarginPerceptron(num_features=X_train.shape[1], mu=mu)
+    elif algo == 'avgperc':
+        model = AveragedPerceptron(num_features=X_train.shape[1], lr=lr)
+    elif algo == 'marginperc':
+        mu = hyperparams.get("mu", 1.0)
+        lr = hyperparams.get("lr", 1.0)
+        model = MarginPerceptron(num_features=X_train.shape[1], lr=lr, mu=mu)
     else:
         raise ValueError("Unknown perceptron variant.")
     
@@ -73,9 +74,14 @@ def main():
     X_train_full, y_train_full = load_data("data/train.csv", label_column="label")
     X_test, y_test = load_data("data/test.csv", label_column="label")
 
+    #Preprocessing data
+    X_train_full = log_transform(X_train_full)
+    X_train_full, train_mean, train_std = standardize_train(X_train_full)
+    X_test = log_transform(X_test)
+    X_test = standardize_test(X_test, train_mean, train_std)
+
     #For perceptron
     y_train_full_conv = convert_labels(y_train_full)
-    y_test_conv = convert_labels(y_test)
 
     #Splitting data into training and evaluation set
     X_train, X_val, y_train, y_val = train_val_split(X_train_full, y_train_full_conv, test_size=0.2)
@@ -122,7 +128,8 @@ def main():
     print(f"Precision: {train_prec:.3f}, Recall: {train_rec:.3f}, F1-score: {train_f1:.3f}")
 
     if y_test is not None:
-        test_prec, test_rec, test_f1 = compute_metrics(y_test, test_preds_conv)
+        y_test_conv = np.where(y_test == -1, 0, y_test)
+        test_prec, test_rec, test_f1 = compute_metrics(y_test_conv, test_preds_conv)
         print("Test Metrics:")
         print(f"Precision: {test_prec:.3f}, Recall: {test_rec:.3f}, F1-score: {test_f1:.3f}")
 

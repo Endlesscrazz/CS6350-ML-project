@@ -14,6 +14,9 @@ class AveragedPerceptron:
         self.w = np.random.uniform(-0.01,0.01, size=num_features)
         self.b = np.random.uniform(-0.01, 0.01)
 
+        self.w_sum = np.zeros(num_features)
+        self.b_sum = 0.0
+
     def get_hyperparams(self) -> dict:
         return {'lr': self.lr}
 
