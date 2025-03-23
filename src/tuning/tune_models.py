@@ -9,18 +9,21 @@ sys.path.append(str(project_src))
 from common.data_loader import load_data
 from common.cross_validation import grid_search_cv_generic
 from models.decision_tree.builders import build_model_decision_tree
-from models.perceptron.builders import build_standard_perceptron
+from models.perceptron.builders import build_standard_perceptron, build_averaged_perceptron, build_margin_perceptron
 
 
 model_builders = {
     "dt" : build_model_decision_tree,
-    "perc": build_standard_perceptron
+    "perc": build_standard_perceptron,
+    "avgperc": build_averaged_perceptron,
+    "marginperc": build_margin_perceptron
 }
 
 def main():
     parser = argparse.ArgumentParser(description="Generic Hyperparameter Tuning Script")
-    parser.add_argument('--model', type=str, default='dt', choices=['dt', 'perc'],
-                        help="Select model to tune: 'dt' for decision tree, 'perc' for standard perceptron")
+    parser.add_argument('--model', type=str, default='dt', choices=['dt', 'perc', 'avgperc', 'marginperc'],
+                        help="Select model to tune: 'dt' for decision tree, 'perc' for standard perceptron,'avgperc' for averaged perceptron, "
+                        "'marginperc' for margin perceptron")
     parser.add_argument('--k', type=int, default=5, help="Number of folds for cross-validation")
     args = parser.parse_args()
     
@@ -28,17 +31,16 @@ def main():
     X_train, y_train = load_data("data/train.csv", label_column="label")
     
     # For perceptron, convert labels to {-1, +1}
-    if args.model == 'perc':
+    if args.model in ['perc', 'avgperc', 'marginperc']:
         y_train = np.where(y_train == 0, -1, 1)
 
     # For decision tree, we assume labels are already {0,1}.
     if args.model == 'dt':
         label_conversion = lambda labels: labels  # identity function
-    elif args.model == 'perc':
+    else:
         # Convert from {-1,1} to {0,1} for evaluation.
         label_conversion = lambda labels: np.where(labels == -1, 0, labels)
-    else:
-        label_conversion = lambda labels: labels
+
     
     # Define hyperparameter grid based on the model type.
     if args.model == 'dt':
@@ -56,6 +58,22 @@ def main():
             for lr in [0.1, 0.5, 1.0]
             for decay in [False, True]
         ]
+    elif args.model == 'avgperc':
+
+        hyperparam_grid = [
+            {"epochs": e, "lr": lr}
+            for e in [5, 10, 15]
+            for lr in [0.1, 0.5, 1.0]
+        ]
+    elif args.model == 'marginperc':
+
+        hyperparam_grid = [
+            {"epochs": e, "lr": lr, "mu":mu}
+            for e in [5, 10, 15]
+            for lr in [0.1, 0.5, 1.0]
+            for mu in [0.8, 1.0, 1.2]
+        ]
+
     else:
         raise ValueError("Unknown model type.")
     
