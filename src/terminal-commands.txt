@@ -1,0 +1,20 @@
+##Train ##
+ensemble model: 
+python3 src/models/ensemble/main.py --max_depth 15 --min_samples_split 2 --epochs 15 --lr 0.1 --decay_lr --mu 0.8 --w_dt 0.4 --w_perc 0.6
+
+avgperc: 
+python3 src/models/perceptron/main.py --algo avgperc --epochs 10 --lr 1.0
+
+
+##Hyperparameter-tuning##
+avgperc : 
+python3 src/tuning/tune_models.py --model avgperc   
+
+##Submission file##
+perceptron : 
+python3 src/common/submission.py --model avgperc --epochs 10 --lr 1.0
+
+ensemble:
+python3 src/common/submission.py --model ensemble --max_depth 15 --min_samples_split 2 --epochs 10 --lr 1.0
+
+
