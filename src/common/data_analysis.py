@@ -24,6 +24,16 @@ for idx,col in enumerate(feature_susbet):
 plt.tight_layout()
 plt.show()
 
+#Box plots for outliers
+fig, axes = plt.subplots(nrows=4, ncols=5, figsize=(15,12))
+axes = axes.ravel()
+for idx, col in enumerate(feature_susbet):
+    sns.boxplot(x=train_df[col], ax=axes[idx])
+    axes[idx].set_title(col)
+plt.tight_layout()
+plt.show()
+
+
 ##Correlation heatmap##
 corr = train_df.corr()
 sns.heatmap(corr, cmap="coolwarm")
