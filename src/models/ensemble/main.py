@@ -5,19 +5,23 @@ import sys
 from pathlib import Path
 import matplotlib.pyplot as plt
 import joblib
+import time
 
+from sklearn.model_selection import train_test_split
 # Add project src to sys.path so that common modules can be imported.
 project_root = Path(__file__).resolve().parents[2]
 sys.path.append(str(project_root))
 
 from common.data_loader import load_data
 from common.evaluation import compute_metrics
-from common.preprocessing import log_transform, standardize_train, standardize_test
+from common.preprocessing import log_transform, standardize_train, standardize_test, remove_low_variance_features, apply_pca, apply_truncated_svd
 from common.plots import plot_learning_curves
 
 from models.decision_tree.builders import build_model_decision_tree
 from models.perceptron.builders import build_standard_perceptron, build_margin_perceptron, build_averaged_perceptron
 from models.ensemble.builders import build_ensemble_model
+
+
 
 def convert_labels(y):
     """
@@ -45,18 +49,23 @@ def main():
     #Number of epochs for plotting learning curve 
     parser.add_argument('--plot_epochs', type=int, default=20, help="Number of epochs for plotting learning curve.")
     args = parser.parse_args()
-    args = parser.parse_args()
 
     # Load full training and test data.
     X_train_full, y_train_full = load_data("data/train.csv", label_column="label")
     X_test, y_test = load_data("data/test.csv", label_column="label")
 
-    # Preprocess training data.
+    # 1)Preprocessing training data.
     X_train_full = log_transform(X_train_full)
     X_train_full, train_mean, train_std = standardize_train(X_train_full)
-    # Preprocess test data using training parameters.
+
+    # 2)Preprocessing test data using training parameters.
     X_test = log_transform(X_test)
     X_test = standardize_test(X_test, train_mean, train_std)
+
+    ## 3)Feature Engineering
+    # Removeing low variance features and reducing dimensionality
+    X_train_full, X_test, selector = remove_low_variance_features(X_train_full, X_test, threshold=1e-4)
+    X_train_full, X_test, svd = apply_truncated_svd(X_train_full, X_test, n_components=50)
 
     ensemble_hyperparams = {
         "dt_params": {
@@ -73,20 +82,33 @@ def main():
         "w_perc": args.w_perc
     }
 
-    #Training
-    # dt_model = build_model_decision_tree(X_train_full, y_train_full, hyperparams_dt)
-    # perc_model = build_averaged_perceptron(X_train_full, y_train_perc, hyperparams_perc)
+    X_train, X_val, y_train, y_val = train_test_split(X_train_full, y_train_full, test_size=0.2, random_state=42)
+    
+    ensemble_model = build_ensemble_model(X_train_full, y_train_full, ensemble_hyperparams)
 
-    model = build_ensemble_model(X_train_full, y_train_full, ensemble_hyperparams)
+    # Updating the ensemble weights dynamically using validation data.
+    ensemble_model.update_weights(X_val, y_val)
 
-    # Evaluate on training set.
-    train_preds = model.predict(X_train_full)
+    if args.plot:
+
+        # Plotting the learning curves
+        plot_learning_curves(
+            model_builder=build_ensemble_model,
+            hyperparams=ensemble_hyperparams,
+            X_train=X_train,
+            y_train=y_train,
+            X_val=X_val,
+            y_val=y_val,
+            epochs=20
+        )
+    
+    # Evaluating the ensemble model using the updated instance.
+    train_preds = ensemble_model.predict(X_train_full)
     train_prec, train_rec, train_f1 = compute_metrics(y_train_full, train_preds)
     print("Final Training Metrics (Ensemble):")
     print(f"Precision: {train_prec:.3f}, Recall: {train_rec:.3f}, F1-score: {train_f1:.3f}")
 
-    # Evaluate on test set.
-    test_preds = model.predict(X_test)
+    test_preds = ensemble_model.predict(X_test)
     if y_test is not None:
         test_prec, test_rec, test_f1 = compute_metrics(y_test, test_preds)
         print("Test Metrics (Ensemble):")
@@ -94,11 +116,10 @@ def main():
     else:
         print("Test labels not available; ready for submission.")
 
-    # Persist the trained model to disk.
-    joblib.dump(model, 'output/best_model_{model}.pkl')
+    # Persist the trained ensemble model to disk.
+    #timestamp = time.strftime("%Y%m%d_%H%M%S")
+    joblib.dump(ensemble_model, f'output/best_model_ensemble.pkl')
     print("Trained model saved to output/best_model.pkl")
-
-    
 
 if __name__ == '__main__':
     main()

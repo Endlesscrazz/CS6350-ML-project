@@ -19,4 +19,6 @@ python3 src/common/submission.py --model ensemble --max_depth 15 --min_samples_s
 
 
 python3 src/common/submission.py --model ensemble --max_depth 10 --min_samples_split 5 --epochs 10 --lr 0.5 --mu 0
-python3 src/models/ensemble/main.py --max_depth 10 --min_samples_split 5 --epochs 10 --lr 0.5 --mu 0 --w_dt 0.5 --w_perc 0.5
+
+
+python3 src/models/ensemble/main.py --max_depth 5 --min_samples_split 5 --epochs 20 --lr 0.1 --mu 0 --w_dt 0.7 --w_perc 0.30000000000000004

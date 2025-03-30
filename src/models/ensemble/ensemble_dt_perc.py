@@ -17,11 +17,13 @@ def ensemble_predict(preds_list, weights=None, threshold=0.5):
     preds_array = np.array(preds_list)
 
     if weights is None:
-        weights = np.one(preds_array.shape[0]) / preds_array.shape[0]
+        weights = np.ones(preds_array.shape[0]) / preds_array.shape[0]
     else:
         weights = np.array(weights)
 
-    combined = np.average(preds_array, axis=0, weights=weights)
+        if weights.sum() == 0:
+            weights = np.ones_like(weights)/len(weights)
 
+    combined = np.average(preds_array, axis=0, weights=weights)
     final_preds = np.where(combined >= threshold, 1, 0)
     return final_preds

@@ -23,14 +23,34 @@ def k_fold_splits(X, y, k=5, seed=42):
     
     return folds
 
-def grid_search_cv_generic(X, y, model_builder, hyperparam_grid, k=5, label_conversion=lambda labels: labels):
+def stratified_k_fold_splits(y, k=5, seed=42):
+    """
+    Function to split data indices into stratified k folds.
+    Each fold will have approximately the same proportion of classes as y.
+    """
+    np.random.seed(seed)
+    folds = [[] for _ in range(k)]
+
+    for label in np.unique(y):
+        label_indices = np.where(y == label)[0]
+        np.random.shuffle(label_indices)
+        splits = np.array_split(label_indices, k)
+
+        for i in range(k):
+            folds[i].extend(splits[i])
+
+    folds = [np.array(fold) for fold in folds]
+    return folds
+
+def grid_search_cv_generic(X, y, model_builder, hyperparam_grid, k=5, label_conversion=lambda labels: labels, stratified=True):
 
     best_f1 = -np.inf
     best_params = None
 
     for params in hyperparam_grid:
             
-            avg_precision, avg_recall, avg_f1_score = cross_validations_generic(X, y, model_builder, params, k=k, label_conversion=label_conversion)
+            avg_precision, avg_recall, avg_f1_score = cross_validations_generic(X, y, model_builder, params, k=k, 
+                                                                                label_conversion=label_conversion,stratified=True)
             print(f"Parameters: {params} => F1: {avg_f1_score:.3f}")
 
             if avg_f1_score > best_f1:
@@ -39,20 +59,24 @@ def grid_search_cv_generic(X, y, model_builder, hyperparam_grid, k=5, label_conv
 
     return best_params, best_f1
 
-def cross_validations_generic(X, y, model_builder, hyperparams, k=5, label_conversion=lambda labels: labels):
+def cross_validations_generic(X, y, model_builder, hyperparams, k=5, label_conversion=lambda labels: labels, stratified=True):
     """
     Function to perform k-fold cross validation
     """
 
-    folds = k_fold_splits(X, y, k=k)
+    if stratified:
+        folds = stratified_k_fold_splits(y, k=k)
+    else:
+        folds = k_fold_splits(X, y, k=k)
+
     precision_list = []
     recall_list = []
     f1_score_list = []
 
     for i in range(k):
 
-        val_indices = folds[i]
-        train_indices = np.concatenate([folds[j] for j in range(k) if j != i])
+        val_indices = np.array(folds[i]).astype(np.intp)
+        train_indices = np.concatenate([folds[j] for j in range(k) if j != i]).astype(np.intp)
 
         X_train_fold = X[train_indices]
         y_train_fold = y[train_indices]

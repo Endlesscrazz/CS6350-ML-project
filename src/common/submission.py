@@ -10,7 +10,7 @@ project_src = Path(__file__).resolve().parents[1]
 sys.path.append(str(project_src))
 
 from common.data_loader import load_data
-from common.preprocessing import log_transform, standardize_train, standardize_test
+from common.preprocessing import log_transform, standardize_train, standardize_test, remove_low_variance_features, apply_truncated_svd
 
 def create_submission(model_file):
     
@@ -20,11 +20,15 @@ def create_submission(model_file):
     # Preprocessing training data 
     X_train = log_transform(X_train)
     X_train, train_mean, train_std = standardize_train(X_train)
+    X_train_reduced, _, selector = remove_low_variance_features(X_train, X_train, threshold=1e-4)
+    X_train_final, _, svd = apply_truncated_svd(X_train_reduced, X_train_reduced, n_components=50)
     
     # Preprocessing evaluation data using the same parameters.
     X_eval = log_transform(X_eval)
     X_eval = standardize_test(X_eval, train_mean, train_std)
-    
+    X_eval_reduced = selector.transform(X_eval)
+    X_eval_final = svd.transform(X_eval_reduced)
+
     try:
         model = joblib.load(model_file)
         print(f"Loaded pre-trained model from {model_file}")
@@ -32,7 +36,7 @@ def create_submission(model_file):
         print(f"Failed to load the model from {model_file}: {e}")
         sys.exit(1)
     
-    eval_preds = model.predict(X_eval)
+    eval_preds = model.predict(X_eval_final)
     
     eval_ids = pd.read_csv("data/eval.id", header=None, names=["example_id"])
     submission = pd.DataFrame({

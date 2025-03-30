@@ -41,11 +41,15 @@ class AveragedPerceptron:
                 self.w_sum += self.w
                 self.b_sum += self.b
                 self.count += 1
-            
-        self.w = self.w_sum / self.count
-        self.b = self.b_sum / self.count
-
-            #print(f"Epoch {epoch +1}: erros={errors}, weight_norm = {np.linalg.norm(self.w):.4f}")
+        
+        if self.count > 0:
+            self.w = self.w_sum / self.count
+            self.b = self.b_sum / self.count
+        else:
+            pass
+            #print("Warning: No weight updates occurred during training; using initial weights.")
+        
+        #print(f"Epoch {epoch +1}: erros={errors}, weight_norm = {np.linalg.norm(self.w):.4f}")
                 
     def predict(self, x) -> list:
 

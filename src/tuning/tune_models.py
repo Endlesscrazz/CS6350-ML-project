@@ -4,6 +4,7 @@ import sys
 import random
 from pathlib import Path
 from joblib import Parallel, delayed
+from sklearn.model_selection import train_test_split
 
 # Append project source directory.
 project_src = Path(__file__).resolve().parents[1]
@@ -11,12 +12,17 @@ sys.path.append(str(project_src))
 
 from common.data_loader import load_data
 from common.cross_validation import grid_search_cv_generic
-from common.preprocessing import standardize_train, log_transform
-from models.decision_tree.builders import build_model_decision_tree
-from models.perceptron.builders import build_standard_perceptron, build_averaged_perceptron, build_margin_perceptron
-from models.ensemble.builders import build_ensemble_model
+from common.preprocessing import standardize_train, log_transform, remove_low_variance_features, apply_truncated_svd
+from models import (
+    build_model_decision_tree,
+    build_standard_perceptron,
+    build_averaged_perceptron,
+    build_margin_perceptron,
+    build_ensemble_model,
+    build_model_adaboost
 
-# Named conversion functions (avoid lambda pickling issues)
+)
+
 def identity_conversion(labels):
     return labels
 
@@ -28,12 +34,19 @@ model_builders = {
     "perc": build_standard_perceptron,
     "avgperc": build_averaged_perceptron,
     "marginperc": build_margin_perceptron,
-    "ensemble": build_ensemble_model
+    "ensemble": build_ensemble_model,
+    "adaboost": build_model_adaboost
 }
 
 def evaluate_params(params, X_train, y_train, model_builder, k, label_conversion):
     print("Evaluating params:", params, type(params))
-    best_params, f1 = grid_search_cv_generic(X_train, y_train, model_builder, [params], k=k, label_conversion=label_conversion)
+    try:
+        best_params, f1 = grid_search_cv_generic(X_train, y_train, model_builder, [params], k=k, 
+                                                label_conversion=label_conversion,stratified=True)
+    except Exception as e:
+        print(f"Exception for params {params}: {e}")
+        f1 = -np.inf
+
     return params, f1
 
 def main():
@@ -50,6 +63,11 @@ def main():
     # Preprocess data.
     X_train = log_transform(X_train)
     X_train, train_mean, train_std = standardize_train(X_train)
+
+    # Feature Engineering
+    X_train, _ , _ = remove_low_variance_features(X_train, X_train, threshold=1e-4)
+    X_train, _ , _ = apply_truncated_svd(X_train, X_train, n_components=50)
+
     
     # For perceptron-based models, convert labels to {-1, +1}.
     if args.model in ['perc', 'avgperc', 'marginperc']:
@@ -103,6 +121,11 @@ def main():
             for decay_lr in [False, True]
             for w_dt in [0.5, 0.6, 0.7]
         ]
+    elif args.model == "adaboos":
+        hyperparam_grid = [
+            {"n_estimators":n}
+            for n in [50, 100, 150]
+        ]
     else:
         raise ValueError("Unknown model type.")
     
@@ -112,20 +135,42 @@ def main():
         hyperparam_grid = random.sample(hyperparam_grid, args.n_iter)
         print(f"Random search: evaluating {args.n_iter} out of {original_grid_size} hyperparameter combinations.")
     
-    model_builder = model_builders[args.model]
+    if args.model == "ensemble":
+        def ensemble_builder_wrapper(X, y, params):
 
-    # # Parallelize evaluation of hyperparameter combinations.
-    # results = Parallel(n_jobs=-1)(
-    #     delayed(evaluate_params)(params, X_train, y_train, model_builder, args.k, label_conversion)
-    #     for params in hyperparam_grid
-    # )
+            # min_val_samples = max(20, min(5, len(X) // 5))  # 20% or at least 1 sample
+            # if len(X) - min_val_samples < 2:  # Need at least 2 training samples
+            #     min_val_samples = len(X) - 2 if len(X) > 2 else 0
+
+            # if min_val_samples > 0:
+            X_train, X_val, y_train, y_val = train_test_split(
+                X, y, test_size=0.2,stratify=y, random_state=42)
+            #print(f"\nDEBUG: Training on {len(X_train)} samples, validating on {len(X_val)} samples")
+            model = build_ensemble_model(X_train, y_train, params)
+            #print("DEBUG: Before weight update - w_dt:", model.w_dt, "w_perc:", model.w_perc)
+            model.update_weights(X_val, y_val)
+            #print("DEBUG: After weight update - w_dt:", model.w_dt, "w_perc:", model.w_perc)
+
+            # else:
+            #     model = build_ensemble_model(X, y, params)
+            return model
+        model_builder = ensemble_builder_wrapper
+    else:
+        model_builder = model_builders[args.model]
+
+    # Parallelize evaluation of hyperparameter combinations.
+    results = Parallel(n_jobs=-1)(
+        delayed(evaluate_params)(params, X_train, y_train, model_builder, args.k, label_conversion)
+        for params in hyperparam_grid
+    )
     
-    results = [evaluate_params(params, X_train, y_train, model_builder, args.k, label_conversion)
-           for params in hyperparam_grid]
+    # results = [evaluate_params(params, X_train, y_train, model_builder, args.k, label_conversion)
+    #        for params in hyperparam_grid]
 
     best_params, best_metric = max(results, key=lambda x: x[1])
     print(f"Best hyperparameters for {args.model}: {best_params} with best metric: {best_metric:.3f}")
 
 if __name__ == '__main__':
-    import cProfile
-    cProfile.run('main()', 'profile_stats')
+    # import cProfile
+    # cProfile.run('main()', 'profile_stats')
+    main()
