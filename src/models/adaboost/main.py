@@ -11,12 +11,16 @@ sys.path.append(str(project_root))
 
 from common.data_loader import load_data
 from common.evaluation import compute_metrics
-from common.preprocessing import log_transform, standardize_train, standardize_test, remove_low_variance_features, apply_truncated_svd
+from common.preprocessing import log_transform, standardize_train, standardize_test, remove_low_variance_features, apply_truncated_svd, apply_pca
 from models.adaboost.builders import build_model_adaboost
 
 def main():
     parser = argparse.ArgumentParser(description="Train AdaBoost model and evaluate performance.")
     parser.add_argument('--n_estimators', type=int, default=50, help="Number of boosting rounds.")
+    parser.add_argument('--n_thresholds', type=int, default=20, help="Number of threshold.")
+    #parser.add_argument('--w_method', type=str, default='uniform', help="type of weight initiliazation")
+    parser.add_argument('--n_weak_learner_d', type=int, default=1, help="depth of weak learner")
+
     args = parser.parse_args()
 
     # Load data (assuming same format as your other models)
@@ -29,9 +33,10 @@ def main():
     X_test = log_transform(X_test)
     X_test = standardize_test(X_test, mean, std)
 
-    # Feature engineering (optional, similar to other models)
+    # Feature engineering 
     X_train, X_test, _ = remove_low_variance_features(X_train, X_test, threshold=1e-4)
-    X_train, X_test, _ = apply_truncated_svd(X_train, X_test, n_components=50)
+   #X_train, X_test, _ = apply_truncated_svd(X_train, X_test, n_components=50)
+    X_train, X_test, _ = apply_pca(X_train, X_test, n_components=50)
 
     # Convert labels for AdaBoost: typically AdaBoost expects {-1, +1}
     y_train = np.where(y_train == 0, -1, 1)

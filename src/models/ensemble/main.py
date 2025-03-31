@@ -17,11 +17,7 @@ from common.evaluation import compute_metrics
 from common.preprocessing import log_transform, standardize_train, standardize_test, remove_low_variance_features, apply_pca, apply_truncated_svd
 from common.plots import plot_learning_curves
 
-from models.decision_tree.builders import build_model_decision_tree
-from models.perceptron.builders import build_standard_perceptron, build_margin_perceptron, build_averaged_perceptron
 from models.ensemble.builders import build_ensemble_model
-
-
 
 def convert_labels(y):
     """

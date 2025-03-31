@@ -12,7 +12,7 @@ sys.path.append(str(project_src))
 
 from common.data_loader import load_data
 from common.cross_validation import grid_search_cv_generic
-from common.preprocessing import standardize_train, log_transform, remove_low_variance_features, apply_truncated_svd
+from common.preprocessing import standardize_train, log_transform, remove_low_variance_features, apply_truncated_svd, apply_pca
 from models import (
     build_model_decision_tree,
     build_standard_perceptron,
@@ -51,7 +51,7 @@ def evaluate_params(params, X_train, y_train, model_builder, k, label_conversion
 
 def main():
     parser = argparse.ArgumentParser(description="Generic Hyperparameter Tuning Script")
-    parser.add_argument('--model', type=str, default='dt', choices=['dt', 'perc', 'avgperc', 'marginperc', 'ensemble'],
+    parser.add_argument('--model', type=str, default='dt', choices=['dt', 'perc', 'avgperc', 'marginperc', 'ensemble', 'adaboost'],
                         help="Select model to tune: 'dt' for decision tree, 'perc' for standard perceptron, 'avgperc' for averaged perceptron, 'marginperc' for margin perceptron, 'ensemble' for ensemble model")
     parser.add_argument('--k', type=int, default=5, help="Number of folds for cross-validation")
     parser.add_argument('--n_iter', type=int, default=20, help="Number of random hyperparameter combinations to try")
@@ -66,11 +66,13 @@ def main():
 
     # Feature Engineering
     X_train, _ , _ = remove_low_variance_features(X_train, X_train, threshold=1e-4)
-    X_train, _ , _ = apply_truncated_svd(X_train, X_train, n_components=50)
+    #X_train, _ , _ = apply_truncated_svd(X_train, X_train, n_components=50)
+    X_train, _ , _ = apply_pca(X_train, X_train, n_components=50)
+
 
     
     # For perceptron-based models, convert labels to {-1, +1}.
-    if args.model in ['perc', 'avgperc', 'marginperc']:
+    if args.model in ['perc', 'avgperc', 'marginperc', 'adaboost']:
         y_train = np.where(y_train == 0, -1, 1)
 
     # Set label conversion function.
@@ -121,10 +123,13 @@ def main():
             for decay_lr in [False, True]
             for w_dt in [0.5, 0.6, 0.7]
         ]
-    elif args.model == "adaboos":
+    elif args.model == "adaboost":
         hyperparam_grid = [
-            {"n_estimators":n}
-            for n in [50, 100, 150]
+            {"n_estimators":n, "n_thresholds": t, "weak_learner_depth":d}
+            for n in [20,50,100]
+            for t in [5, 10, 20]
+            for d in [2,3]
+            #for method in ['uniform', 'balanced']
         ]
     else:
         raise ValueError("Unknown model type.")

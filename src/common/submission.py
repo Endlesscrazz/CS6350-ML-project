@@ -35,8 +35,11 @@ def create_submission(model_file):
     except Exception as e:
         print(f"Failed to load the model from {model_file}: {e}")
         sys.exit(1)
-    
-    eval_preds = model.predict(X_eval_final)
+
+    if hasattr(model, 'predict_submission'):
+        eval_preds = model.predict_submission(X_eval_final)
+    else:
+        eval_preds = model.predict(X_eval_final)
     
     eval_ids = pd.read_csv("data/eval.id", header=None, names=["example_id"])
     submission = pd.DataFrame({
@@ -49,7 +52,7 @@ def create_submission(model_file):
 
 def main():
     parser = argparse.ArgumentParser(description="Generate submission file using a pre-trained model.")
-    parser.add_argument('--model', type=str, default='dt', choices=['dt', 'perc', 'avgperc', 'marginperc', 'ensemble'],
+    parser.add_argument('--model', type=str, default='dt', choices=['dt', 'perc', 'avgperc', 'marginperc', 'ensemble', 'adaboost'],
                         help="Select model type: 'dt', 'perc', 'avgperc', 'marginperc', or 'ensemble'")
     parser.add_argument('--model_file', type=str, default=None,
                         help="Path to the pre-trained model file. Defaults to output/best_model_{model}.pkl if not specified.")
