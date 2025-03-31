@@ -12,7 +12,7 @@ sys.path.append(str(project_src))
 
 from common.data_loader import load_data
 from common.cross_validation import grid_search_cv_generic
-from common.preprocessing import standardize_train, log_transform, remove_low_variance_features, apply_truncated_svd, apply_pca
+from common.preprocessing import preprocessing_pipeline
 from models import (
     build_model_decision_tree,
     build_standard_perceptron,
@@ -61,16 +61,8 @@ def main():
     X_train, y_train = load_data("data/train.csv", label_column="label")
 
     # Preprocess data.
-    X_train = log_transform(X_train)
-    X_train, train_mean, train_std = standardize_train(X_train)
+    X_train_trans = preprocessing_pipeline.fit_transform(X_train)
 
-    # Feature Engineering
-    X_train, _ , _ = remove_low_variance_features(X_train, X_train, threshold=1e-4)
-    #X_train, _ , _ = apply_truncated_svd(X_train, X_train, n_components=50)
-    X_train, _ , _ = apply_pca(X_train, X_train, n_components=50)
-
-
-    
     # For perceptron-based models, convert labels to {-1, +1}.
     if args.model in ['perc', 'avgperc', 'marginperc', 'adaboost']:
         y_train = np.where(y_train == 0, -1, 1)
@@ -112,7 +104,7 @@ def main():
         hyperparam_grid = [
             {
                 "dt_params": {"max_depth": d, "min_samples_split": s},
-                "perc_params": {"epochs": e, "lr": lr, "decay_lr": decay_lr, "mu": 0},
+                "perc_params": {"epochs": e, "lr": lr, "decay_lr": decay_lr, "mu": mu},
                 "w_dt": w_dt,
                 "w_perc": 1 - w_dt
             }
@@ -122,6 +114,7 @@ def main():
             for lr in [0.1, 0.5]
             for decay_lr in [False, True]
             for w_dt in [0.5, 0.6, 0.7]
+            for mu in [0.8, 1.0, 1.2]
         ]
     elif args.model == "adaboost":
         hyperparam_grid = [
@@ -148,10 +141,10 @@ def main():
             #     min_val_samples = len(X) - 2 if len(X) > 2 else 0
 
             # if min_val_samples > 0:
-            X_train, X_val, y_train, y_val = train_test_split(
+            X_train_sub, X_val, y_train_sub, y_val = train_test_split(
                 X, y, test_size=0.2,stratify=y, random_state=42)
             #print(f"\nDEBUG: Training on {len(X_train)} samples, validating on {len(X_val)} samples")
-            model = build_ensemble_model(X_train, y_train, params)
+            model = build_ensemble_model(X_train_sub, y_train_sub, params)
             #print("DEBUG: Before weight update - w_dt:", model.w_dt, "w_perc:", model.w_perc)
             model.update_weights(X_val, y_val)
             #print("DEBUG: After weight update - w_dt:", model.w_dt, "w_perc:", model.w_perc)
@@ -165,7 +158,7 @@ def main():
 
     # Parallelize evaluation of hyperparameter combinations.
     results = Parallel(n_jobs=-1)(
-        delayed(evaluate_params)(params, X_train, y_train, model_builder, args.k, label_conversion)
+        delayed(evaluate_params)(params, X_train_trans, y_train, model_builder, args.k, label_conversion)
         for params in hyperparam_grid
     )
     

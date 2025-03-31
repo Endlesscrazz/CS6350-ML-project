@@ -14,7 +14,7 @@ sys.path.append(str(project_root))
 
 from common.data_loader import load_data
 from common.evaluation import compute_metrics
-from common.preprocessing import log_transform, standardize_train, standardize_test, remove_low_variance_features, apply_pca, apply_truncated_svd
+from common.preprocessing import preprocessing_pipeline
 from common.plots import plot_learning_curves
 
 from models.ensemble.builders import build_ensemble_model
@@ -50,18 +50,10 @@ def main():
     X_train_full, y_train_full = load_data("data/train.csv", label_column="label")
     X_test, y_test = load_data("data/test.csv", label_column="label")
 
-    # 1)Preprocessing training data.
-    X_train_full = log_transform(X_train_full)
-    X_train_full, train_mean, train_std = standardize_train(X_train_full)
+    # Preprocess data
+    X_train_full_trans = preprocessing_pipeline.fit_transform(X_train_full)
+    X_test_trans = preprocessing_pipeline.transform(X_test)
 
-    # 2)Preprocessing test data using training parameters.
-    X_test = log_transform(X_test)
-    X_test = standardize_test(X_test, train_mean, train_std)
-
-    ## 3)Feature Engineering
-    # Removeing low variance features and reducing dimensionality
-    X_train_full, X_test, selector = remove_low_variance_features(X_train_full, X_test, threshold=1e-4)
-    X_train_full, X_test, svd = apply_truncated_svd(X_train_full, X_test, n_components=50)
 
     ensemble_hyperparams = {
         "dt_params": {
@@ -78,9 +70,9 @@ def main():
         "w_perc": args.w_perc
     }
 
-    X_train, X_val, y_train, y_val = train_test_split(X_train_full, y_train_full, test_size=0.2, random_state=42)
+    X_train, X_val, y_train, y_val = train_test_split(X_train_full_trans, y_train_full, test_size=0.2, random_state=42)
     
-    ensemble_model = build_ensemble_model(X_train_full, y_train_full, ensemble_hyperparams)
+    ensemble_model = build_ensemble_model(X_train_full_trans, y_train_full, ensemble_hyperparams)
 
     # Updating the ensemble weights dynamically using validation data.
     ensemble_model.update_weights(X_val, y_val)
@@ -99,12 +91,12 @@ def main():
         )
     
     # Evaluating the ensemble model using the updated instance.
-    train_preds = ensemble_model.predict(X_train_full)
+    train_preds = ensemble_model.predict(X_train_full_trans)
     train_prec, train_rec, train_f1 = compute_metrics(y_train_full, train_preds)
     print("Final Training Metrics (Ensemble):")
     print(f"Precision: {train_prec:.3f}, Recall: {train_rec:.3f}, F1-score: {train_f1:.3f}")
 
-    test_preds = ensemble_model.predict(X_test)
+    test_preds = ensemble_model.predict(X_test_trans)
     if y_test is not None:
         test_prec, test_rec, test_f1 = compute_metrics(y_test, test_preds)
         print("Test Metrics (Ensemble):")

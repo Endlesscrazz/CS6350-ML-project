@@ -11,7 +11,7 @@ sys.path.append(str(project_root))
 
 from common.data_loader import load_data
 from common.evaluation import compute_metrics
-from common.preprocessing import log_transform, standardize_train, standardize_test, remove_low_variance_features, apply_truncated_svd, apply_pca
+from common.preprocessing import preprocessing_pipeline
 from models.adaboost.builders import build_model_adaboost
 
 def main():
@@ -28,28 +28,21 @@ def main():
     X_test, y_test = load_data("data/test.csv", label_column="label")
 
     # Preprocess data
-    X_train = log_transform(X_train)
-    X_train, mean, std = standardize_train(X_train)
-    X_test = log_transform(X_test)
-    X_test = standardize_test(X_test, mean, std)
-
-    # Feature engineering 
-    X_train, X_test, _ = remove_low_variance_features(X_train, X_test, threshold=1e-4)
-   #X_train, X_test, _ = apply_truncated_svd(X_train, X_test, n_components=50)
-    X_train, X_test, _ = apply_pca(X_train, X_test, n_components=50)
+    X_train_trans = preprocessing_pipeline.fit_transform(X_train)
+    X_test_trans = preprocessing_pipeline.transform(X_test)
 
     # Convert labels for AdaBoost: typically AdaBoost expects {-1, +1}
     y_train = np.where(y_train == 0, -1, 1)
 
     hyperparams = {"n_estimators": args.n_estimators}
-    model = build_model_adaboost(X_train, y_train, hyperparams)
+    model = build_model_adaboost(X_train_trans, y_train, hyperparams)
 
-    train_preds = model.predict(X_train)
+    train_preds = model.predict(X_train_trans)
     train_prec, train_rec, train_f1 = compute_metrics(y_train, train_preds)
     print("Training Metrics:")
     print(f"Precision: {train_prec:.3f}, Recall: {train_rec:.3f}, F1-score: {train_f1:.3f}")
 
-    test_preds = model.predict(X_test)
+    test_preds = model.predict(X_test_trans)
     if y_test is not None:
         # Convert test labels similarly if needed
         y_test_conv = np.where(y_test == 0, -1, 1)

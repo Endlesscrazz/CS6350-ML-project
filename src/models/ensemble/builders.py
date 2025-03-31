@@ -69,7 +69,7 @@ def build_ensemble_model(X_train, y_train, hyperparams):
     
     # For perceptron, convert labels from {0,1} to {-1,1}.
     y_train_perc = np.where(y_train == 0, -1, 1)
-    perc_model = build_averaged_perceptron(X_train, y_train_perc, hyperparams['perc_params'])
+    perc_model = build_margin_perceptron(X_train, y_train_perc, hyperparams['perc_params'])
 
     #initial_weights = (hyperparams.get('w_dt', 0.5), hyperparams.get('w_perc', 0.5))
     
