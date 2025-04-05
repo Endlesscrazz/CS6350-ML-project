@@ -19,7 +19,8 @@ from models import (
     build_averaged_perceptron,
     build_margin_perceptron,
     build_ensemble_model,
-    build_model_adaboost
+    build_model_adaboost,
+    build_model_svm
 
 )
 
@@ -35,7 +36,9 @@ model_builders = {
     "avgperc": build_averaged_perceptron,
     "marginperc": build_margin_perceptron,
     "ensemble": build_ensemble_model,
-    "adaboost": build_model_adaboost
+    "adaboost": build_model_adaboost,
+    "svm": build_model_svm,
+
 }
 
 def evaluate_params(params, X_train, y_train, model_builder, k, label_conversion):
@@ -51,7 +54,7 @@ def evaluate_params(params, X_train, y_train, model_builder, k, label_conversion
 
 def main():
     parser = argparse.ArgumentParser(description="Generic Hyperparameter Tuning Script")
-    parser.add_argument('--model', type=str, default='dt', choices=['dt', 'perc', 'avgperc', 'marginperc', 'ensemble', 'adaboost'],
+    parser.add_argument('--model', type=str, default='dt', choices=['dt', 'perc', 'avgperc', 'marginperc', 'ensemble', 'adaboost', 'svm'],
                         help="Select model to tune: 'dt' for decision tree, 'perc' for standard perceptron, 'avgperc' for averaged perceptron, 'marginperc' for margin perceptron, 'ensemble' for ensemble model")
     parser.add_argument('--k', type=int, default=5, help="Number of folds for cross-validation")
     parser.add_argument('--n_iter', type=int, default=20, help="Number of random hyperparameter combinations to try")
@@ -64,7 +67,7 @@ def main():
     X_train_trans = preprocessing_pipeline.fit_transform(X_train)
 
     # For perceptron-based models, convert labels to {-1, +1}.
-    if args.model in ['perc', 'avgperc', 'marginperc', 'adaboost']:
+    if args.model in ['perc', 'avgperc', 'marginperc', 'adaboost', 'svm']:
         y_train = np.where(y_train == 0, -1, 1)
 
     # Set label conversion function.
@@ -123,6 +126,13 @@ def main():
             for t in [5, 10, 20]
             for d in [2,3]
             #for method in ['uniform', 'balanced']
+        ]
+    elif args.model =="svm":
+        hyperparam_grid = [
+            {"lr": lr, "lambda_param": lp, "n_epochs": n}
+            for lr in [0.001, 0.01, 0.1]
+            for lp in [0.001, 0.01, 0.1]
+            for n in [500, 1000]
         ]
     else:
         raise ValueError("Unknown model type.")

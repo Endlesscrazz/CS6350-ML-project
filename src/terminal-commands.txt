@@ -8,6 +8,8 @@ python3 src/models/perceptron/main.py --algo avgperc --epochs 10 --lr 1.0
 adaboost
 python3 src/models/adaboost/main.py --n_estimators 100 --n_thresholds 20 --n_weak_learner_d 3
 
+svm
+python3 src/models/svm/main.py --lr 0.001 --lambda_param 0.001 --n_epochs 500
 
 ##Hyperparameter-tuning##
 avgperc : 

@@ -49,7 +49,7 @@ def create_submission(model_file, pipeline_file):
 
 def main():
     parser = argparse.ArgumentParser(description="Generate submission file using a pre-trained model.")
-    parser.add_argument('--model', type=str, default='dt', choices=['dt', 'perc', 'avgperc', 'marginperc', 'ensemble', 'adaboost'],
+    parser.add_argument('--model', type=str, default='dt', choices=['dt', 'perc', 'avgperc', 'marginperc', 'ensemble', 'adaboost', 'svm'],
                         help="Select model type: 'dt', 'perc', 'avgperc', 'marginperc', or 'ensemble'")
     parser.add_argument('--model_file', type=str, default=None,
                         help="Path to the pre-trained model file. Defaults to output/best_model_{model}.pkl if not specified.")
@@ -61,7 +61,7 @@ def main():
     if args.model_file is None:
         args.model_file = f"output/best_model_{args.model}.pkl"
     
-    create_submission(args.model_file)
+    create_submission(args.model_file, args.pipeline_file)
 
 if __name__ == '__main__':
     main()
