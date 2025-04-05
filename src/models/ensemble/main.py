@@ -54,6 +54,7 @@ def main():
     X_train_full_trans = preprocessing_pipeline.fit_transform(X_train_full)
     X_test_trans = preprocessing_pipeline.transform(X_test)
 
+    joblib.dump(preprocessing_pipeline, 'output/preprocessing_pipeline.pkl')
 
     ensemble_hyperparams = {
         "dt_params": {

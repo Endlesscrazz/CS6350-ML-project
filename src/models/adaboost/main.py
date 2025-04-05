@@ -31,6 +31,9 @@ def main():
     X_train_trans = preprocessing_pipeline.fit_transform(X_train)
     X_test_trans = preprocessing_pipeline.transform(X_test)
 
+    #Persisting training pipelien for later use
+    joblib.dump(preprocessing_pipeline, 'output/preprocessing_pipeline.pkl')
+
     # Convert labels for AdaBoost: typically AdaBoost expects {-1, +1}
     y_train = np.where(y_train == 0, -1, 1)
 

@@ -12,13 +12,18 @@ sys.path.append(str(project_src))
 from common.data_loader import load_data
 from common.preprocessing import preprocessing_pipeline
 
-def create_submission(model_file):
+def create_submission(model_file, pipeline_file):
     
     X_eval, _ = load_data("data/eval.anon.csv", label_column="label")
-    X_train, _ = load_data("data/train.csv", label_column="label")
     
-    # Preprocessing training data 
-    X_train_trans = preprocessing_pipeline.fit_transform(X_train)
+     # Load the pre-trained pipeline from disk.
+    try:
+        preprocessing_pipeline = joblib.load(pipeline_file)
+        print(f"Loaded preprocessing pipeline from {pipeline_file}")
+    except Exception as e:
+        print(f"Failed to load preprocessing pipeline: {e}")
+        sys.exit(1)
+
     X_eval_trans = preprocessing_pipeline.transform(X_eval)
     
     try:
@@ -48,8 +53,10 @@ def main():
                         help="Select model type: 'dt', 'perc', 'avgperc', 'marginperc', or 'ensemble'")
     parser.add_argument('--model_file', type=str, default=None,
                         help="Path to the pre-trained model file. Defaults to output/best_model_{model}.pkl if not specified.")
+    parser.add_argument('--pipeline_file', type=str, default="output/preprocessing_pipeline.pkl",
+                        help="Path to the saved preprocessing pipeline file.")
     args = parser.parse_args()
-    
+
     # If no model_file is provided, use a default based on the model type.
     if args.model_file is None:
         args.model_file = f"output/best_model_{args.model}.pkl"

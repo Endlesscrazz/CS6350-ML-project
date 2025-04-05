@@ -5,6 +5,9 @@ python3 src/models/ensemble/main.py --max_depth 15 --min_samples_split 2 --epoch
 avgperc: 
 python3 src/models/perceptron/main.py --algo avgperc --epochs 10 --lr 1.0
 
+adaboost
+python3 src/models/adaboost/main.py --n_estimators 100 --n_thresholds 20 --n_weak_learner_d 3
+
 
 ##Hyperparameter-tuning##
 avgperc : 
@@ -13,6 +16,7 @@ python3 src/tuning/tune_models.py --model avgperc
 ##Submission file##
 perceptron : 
 python3 src/common/submission.py --model avgperc --epochs 10 --lr 1.0
+
 
 ensemble:
 python3 src/common/submission.py --model ensemble --max_depth 15 --min_samples_split 2 --epochs 10 --lr 1.0
