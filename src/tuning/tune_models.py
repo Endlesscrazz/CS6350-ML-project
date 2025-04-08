@@ -3,7 +3,7 @@ import numpy as np
 import sys
 import random
 from pathlib import Path
-from joblib import Parallel, delayed
+from joblib import Parallel, delayed, dump
 from sklearn.model_selection import train_test_split
 
 # Append project source directory.
@@ -12,7 +12,7 @@ sys.path.append(str(project_src))
 
 from common.data_loader import load_data
 from common.cross_validation import grid_search_cv_generic
-from common.preprocessing import preprocessing_pipeline
+from common.preprocessing import preprocessing_pipelines  
 from models import (
     build_model_decision_tree,
     build_standard_perceptron,
@@ -21,7 +21,6 @@ from models import (
     build_ensemble_model,
     build_model_adaboost,
     build_model_svm
-
 )
 
 def identity_conversion(labels):
@@ -38,14 +37,15 @@ model_builders = {
     "ensemble": build_ensemble_model,
     "adaboost": build_model_adaboost,
     "svm": build_model_svm,
-
 }
 
 def evaluate_params(params, X_train, y_train, model_builder, k, label_conversion):
     print("Evaluating params:", params, type(params))
     try:
-        best_params, f1 = grid_search_cv_generic(X_train, y_train, model_builder, [params], k=k, 
-                                                label_conversion=label_conversion,stratified=True)
+        best_params, f1 = grid_search_cv_generic(
+            X_train, y_train, model_builder, [params],
+            k=k, label_conversion=label_conversion, stratified=True
+        )
     except Exception as e:
         print(f"Exception for params {params}: {e}")
         f1 = -np.inf
@@ -63,9 +63,6 @@ def main():
     # Load training data.
     X_train, y_train = load_data("data/train.csv", label_column="label")
 
-    # Preprocess data.
-    X_train_trans = preprocessing_pipeline.fit_transform(X_train)
-
     # For perceptron-based models, convert labels to {-1, +1}.
     if args.model in ['perc', 'avgperc', 'marginperc', 'adaboost', 'svm']:
         y_train = np.where(y_train == 0, -1, 1)
@@ -76,7 +73,7 @@ def main():
     else:
         label_conversion = convert_neg1_to0
 
-    # Define hyperparameter grid.
+    # Define hyperparameter grid based on model type.
     if args.model == 'dt':
         hyperparam_grid = [
             {"max_depth": d, "min_samples_split": s}
@@ -121,13 +118,12 @@ def main():
         ]
     elif args.model == "adaboost":
         hyperparam_grid = [
-            {"n_estimators":n, "n_thresholds": t, "weak_learner_depth":d}
-            for n in [20,50,100]
+            {"n_estimators": n, "n_thresholds": t, "weak_learner_depth": d}
+            for n in [20, 50, 100]
             for t in [5, 10, 20]
-            for d in [2,3]
-            #for method in ['uniform', 'balanced']
+            for d in [2, 3]
         ]
-    elif args.model =="svm":
+    elif args.model == "svm":
         hyperparam_grid = [
             {"lr": lr, "lambda_param": lp, "n_epochs": n}
             for lr in [0.001, 0.01, 0.1]
@@ -137,48 +133,62 @@ def main():
     else:
         raise ValueError("Unknown model type.")
     
-    # Random search: sample a subset if grid is larger than n_iter.
-    if len(hyperparam_grid) > args.n_iter:
-        original_grid_size = len(hyperparam_grid)
-        hyperparam_grid = random.sample(hyperparam_grid, args.n_iter)
-        print(f"Random search: evaluating {args.n_iter} out of {original_grid_size} hyperparameter combinations.")
-    
+    # Set model builder based on the model type.
     if args.model == "ensemble":
         def ensemble_builder_wrapper(X, y, params):
-
-            # min_val_samples = max(20, min(5, len(X) // 5))  # 20% or at least 1 sample
-            # if len(X) - min_val_samples < 2:  # Need at least 2 training samples
-            #     min_val_samples = len(X) - 2 if len(X) > 2 else 0
-
-            # if min_val_samples > 0:
             X_train_sub, X_val, y_train_sub, y_val = train_test_split(
-                X, y, test_size=0.2,stratify=y, random_state=42)
-            #print(f"\nDEBUG: Training on {len(X_train)} samples, validating on {len(X_val)} samples")
+                X, y, test_size=0.2, stratify=y, random_state=42)
             model = build_ensemble_model(X_train_sub, y_train_sub, params)
-            #print("DEBUG: Before weight update - w_dt:", model.w_dt, "w_perc:", model.w_perc)
             model.update_weights(X_val, y_val)
-            #print("DEBUG: After weight update - w_dt:", model.w_dt, "w_perc:", model.w_perc)
-
-            # else:
-            #     model = build_ensemble_model(X, y, params)
             return model
         model_builder = ensemble_builder_wrapper
     else:
         model_builder = model_builders[args.model]
 
-    # Parallelize evaluation of hyperparameter combinations.
-    results = Parallel(n_jobs=-1)(
-        delayed(evaluate_params)(params, X_train_trans, y_train, model_builder, args.k, label_conversion)
-        for params in hyperparam_grid
-    )
-    
-    # results = [evaluate_params(params, X_train, y_train, model_builder, args.k, label_conversion)
-    #        for params in hyperparam_grid]
+    best_overall_f1 = -np.inf
+    best_pipeline_name = None
+    best_pipeline_obj = None
+    best_hyperparams_overall = None
 
-    best_params, best_metric = max(results, key=lambda x: x[1])
-    print(f"Best hyperparameters for {args.model}: {best_params} with best metric: {best_metric:.3f}")
+    # Iterate over each pre-processing pipeline.
+    for pipeline_name, pipeline in preprocessing_pipelines.items():
+        print(f"\nEvaluating pre-processing pipeline: {pipeline_name}")
+        X_train_trans = pipeline.fit_transform(X_train)
+        
+        # Sample hyperparameter grid if grid size exceeds n_iter.
+        if len(hyperparam_grid) > args.n_iter:
+            hyperparam_grid_sub = random.sample(hyperparam_grid, args.n_iter)
+            print(f"Random search: evaluating {args.n_iter} out of {len(hyperparam_grid)} hyperparameter combinations.")
+        else:
+            hyperparam_grid_sub = hyperparam_grid
+
+        results = Parallel(n_jobs=-1)(
+            delayed(evaluate_params)(params, X_train_trans, y_train, model_builder, args.k, label_conversion)
+            for params in hyperparam_grid_sub
+        )
+        
+        best_params, best_metric = max(results, key=lambda x: x[1])
+        print(f"Best hyperparameters with pipeline {pipeline_name}: {best_params} with F1: {best_metric:.3f}")
+
+        if best_metric > best_overall_f1:
+            best_overall_f1 = best_metric
+            best_pipeline_name = pipeline_name
+            best_pipeline_obj = pipeline
+            best_hyperparams_overall = best_params
+    
+    print(f"\nOverall best pre-processing pipeline: {best_pipeline_name}")
+    print(f"Best hyperparameters: {best_hyperparams_overall} with F1: {best_overall_f1:.3f}")
+
+    # Save best pipeline and hyperparameters for later training on the full dataset.
+    best_config = {
+        "pipeline_name": best_pipeline_name,
+        "pipeline": best_pipeline_obj,
+        "hyperparameters": best_hyperparams_overall,
+        "model": args.model,
+        "f1_score": best_overall_f1
+    }
+    dump(best_config, "best_model_config.pkl")
+    print("Saved best pipeline and hyperparameters to best_model_config.pkl")
 
 if __name__ == '__main__':
-    # import cProfile
-    # cProfile.run('main()', 'profile_stats')
     main()
