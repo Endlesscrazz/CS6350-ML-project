@@ -2,9 +2,11 @@ import argparse
 import numpy as np
 import sys
 import random
+import os
 from pathlib import Path
 from joblib import Parallel, delayed, dump
 from sklearn.model_selection import train_test_split
+from sklearn.base import clone  # used to create independent copies of pipelines
 
 # Append project source directory.
 project_src = Path(__file__).resolve().parents[1]
@@ -12,7 +14,7 @@ sys.path.append(str(project_src))
 
 from common.data_loader import load_data
 from common.cross_validation import grid_search_cv_generic
-from common.preprocessing import preprocessing_pipelines  
+from common.preprocessing import preprocessing_pipelines  # Import all defined pipelines
 from models import (
     build_model_decision_tree,
     build_standard_perceptron,
@@ -40,7 +42,7 @@ model_builders = {
 }
 
 def evaluate_params(params, X_train, y_train, model_builder, k, label_conversion):
-    print("Evaluating params:", params, type(params))
+    print("Evaluating params:", params)
     try:
         best_params, f1 = grid_search_cv_generic(
             X_train, y_train, model_builder, [params],
@@ -49,13 +51,13 @@ def evaluate_params(params, X_train, y_train, model_builder, k, label_conversion
     except Exception as e:
         print(f"Exception for params {params}: {e}")
         f1 = -np.inf
-
     return params, f1
 
 def main():
     parser = argparse.ArgumentParser(description="Generic Hyperparameter Tuning Script")
-    parser.add_argument('--model', type=str, default='dt', choices=['dt', 'perc', 'avgperc', 'marginperc', 'ensemble', 'adaboost', 'svm'],
-                        help="Select model to tune: 'dt' for decision tree, 'perc' for standard perceptron, 'avgperc' for averaged perceptron, 'marginperc' for margin perceptron, 'ensemble' for ensemble model")
+    parser.add_argument('--model', type=str, default='dt',
+                        choices=['dt', 'perc', 'avgperc', 'marginperc', 'ensemble', 'adaboost', 'svm'],
+                        help="Select model to tune")
     parser.add_argument('--k', type=int, default=5, help="Number of folds for cross-validation")
     parser.add_argument('--n_iter', type=int, default=20, help="Number of random hyperparameter combinations to try")
     args = parser.parse_args()
@@ -73,7 +75,7 @@ def main():
     else:
         label_conversion = convert_neg1_to0
 
-    # Define hyperparameter grid based on model type.
+    # Define hyperparameter grid based on the model type.
     if args.model == 'dt':
         hyperparam_grid = [
             {"max_depth": d, "min_samples_split": s}
@@ -133,7 +135,7 @@ def main():
     else:
         raise ValueError("Unknown model type.")
     
-    # Set model builder based on the model type.
+    # Set model builder.
     if args.model == "ensemble":
         def ensemble_builder_wrapper(X, y, params):
             X_train_sub, X_val, y_train_sub, y_val = train_test_split(
@@ -145,50 +147,68 @@ def main():
     else:
         model_builder = model_builders[args.model]
 
+    # Define candidate PCA n_components values.
+    candidate_n_components = [50, 70, 100]
+
     best_overall_f1 = -np.inf
     best_pipeline_name = None
     best_pipeline_obj = None
     best_hyperparams_overall = None
+    best_n_components = None
 
-    # Iterate over each pre-processing pipeline.
+    # Loop over each pre-processing pipeline and candidate n_components.
     for pipeline_name, pipeline in preprocessing_pipelines.items():
-        print(f"\nEvaluating pre-processing pipeline: {pipeline_name}")
-        X_train_trans = pipeline.fit_transform(X_train)
-        
-        # Sample hyperparameter grid if grid size exceeds n_iter.
-        if len(hyperparam_grid) > args.n_iter:
-            hyperparam_grid_sub = random.sample(hyperparam_grid, args.n_iter)
-            print(f"Random search: evaluating {args.n_iter} out of {len(hyperparam_grid)} hyperparameter combinations.")
-        else:
-            hyperparam_grid_sub = hyperparam_grid
+        for n_components in candidate_n_components:
+            # Clone the pipeline to ensure an independent copy.
+            current_pipeline = clone(pipeline)
+            current_pipeline.set_params(pca__n_components=n_components)
+            
+            print(f"\nEvaluating pre-processing pipeline: {pipeline_name} with PCA n_components = {n_components}")
+            X_train_trans = current_pipeline.fit_transform(X_train)
+            
+            # Sample hyperparameter grid if necessary.
+            if len(hyperparam_grid) > args.n_iter:
+                hyperparam_grid_sub = random.sample(hyperparam_grid, args.n_iter)
+                print(f"Random search: evaluating {args.n_iter} out of {len(hyperparam_grid)} hyperparameter combinations.")
+            else:
+                hyperparam_grid_sub = hyperparam_grid
 
-        results = Parallel(n_jobs=-1)(
-            delayed(evaluate_params)(params, X_train_trans, y_train, model_builder, args.k, label_conversion)
-            for params in hyperparam_grid_sub
-        )
-        
-        best_params, best_metric = max(results, key=lambda x: x[1])
-        print(f"Best hyperparameters with pipeline {pipeline_name}: {best_params} with F1: {best_metric:.3f}")
+            results = Parallel(n_jobs=-1)(
+                delayed(evaluate_params)(params, X_train_trans, y_train, model_builder, args.k, label_conversion)
+                for params in hyperparam_grid_sub
+            )
+            
+            best_params, best_metric = max(results, key=lambda x: x[1])
+            print(f"Best hyperparameters with pipeline {pipeline_name} (PCA n_components={n_components}): {best_params} with F1: {best_metric:.3f}")
+            
+            # Update overall best configuration if this combination is superior.
+            if best_metric > best_overall_f1:
+                best_overall_f1 = best_metric
+                best_pipeline_name = pipeline_name
+                best_pipeline_obj = current_pipeline  # current_pipeline already has its PCA set.
+                best_hyperparams_overall = best_params
+                best_n_components = n_components
 
-        if best_metric > best_overall_f1:
-            best_overall_f1 = best_metric
-            best_pipeline_name = pipeline_name
-            best_pipeline_obj = pipeline
-            best_hyperparams_overall = best_params
-    
-    print(f"\nOverall best pre-processing pipeline: {best_pipeline_name}")
-    print(f"Best hyperparameters: {best_hyperparams_overall} with F1: {best_overall_f1:.3f}")
+    print(f"\nOverall best pre-processing pipeline: {best_pipeline_name} with PCA n_components = {best_n_components}")
+    print(f"Best hyperparameters for model {args.model}: {best_hyperparams_overall} with F1: {best_overall_f1:.3f}")
 
-    # Save best pipeline and hyperparameters for later training on the full dataset.
+    # Create folder tuned_models if it doesn't exist.
+    tuned_folder = "tuned_models"
+    if not os.path.exists(tuned_folder):
+        os.makedirs(tuned_folder)
+
+    # Save best pipeline configuration and hyperparameters using model name in file.
+    tuned_config_file = os.path.join(tuned_folder, f"{args.model}_best_model_config.pkl")
     best_config = {
         "pipeline_name": best_pipeline_name,
+        "pca_n_components": best_n_components,
         "pipeline": best_pipeline_obj,
         "hyperparameters": best_hyperparams_overall,
         "model": args.model,
         "f1_score": best_overall_f1
     }
-    dump(best_config, "best_model_config.pkl")
-    print("Saved best pipeline and hyperparameters to best_model_config.pkl")
+    dump(best_config, tuned_config_file)
+    print(f"Saved best pipeline configuration and hyperparameters to {tuned_config_file}")
 
 if __name__ == '__main__':
     main()
