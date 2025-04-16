@@ -31,11 +31,16 @@ pipeline_log_minmax = Pipeline([
 #     ('pca', PCA(n_components=50, random_state=42)),
 # ])
 
+pipeline_scaled_only = Pipeline([
+  ('scaler', StandardScaler()),
+  ('var_thresh', VarianceThreshold(threshold=1e-4)),
+])
+
 # Dictionary to hold all pipeline options.
 preprocessing_pipelines = {
     "log_standard": pipeline_log_standard,
     "log_minmax": pipeline_log_minmax,
-    #"no_log": pipeline_no_log
+    "scaled_only": pipeline_scaled_only
 }
 
 # For backward compatibility, aliasing the default pipeline.

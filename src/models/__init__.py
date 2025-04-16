@@ -15,6 +15,8 @@ from models.ensemble.builders import build_ensemble_model
 
 from models.adaboost.builders import build_model_adaboost
 
+from models.nerual_network.nn import build_model_nn
+
 from models.svm import build_model_svm
 __all__ = [
     "build_model_decision_tree",
@@ -23,5 +25,6 @@ __all__ = [
     "build_margin_perceptron",
     "build_ensemble_model",
     "build_model_adaboost",
-    "build_model_svm"
+    "build_model_svm",
+    "build_model_nn"
 ]
