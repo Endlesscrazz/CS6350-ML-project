@@ -1,3 +1,5 @@
+# submission.py
+
 import sys
 import argparse
 import pandas as pd
@@ -5,63 +7,97 @@ from pathlib import Path
 import numpy as np
 import joblib
 
-
-project_src = Path(__file__).resolve().parents[1]
-sys.path.append(str(project_src))
+# add project src to path
+PROJECT_SRC = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_SRC))
 
 from common.data_loader import load_data
-from common.preprocessing import preprocessing_pipeline
 
-def create_submission(model_file, pipeline_file):
-    
+def create_submission(model_type, model_file, pipeline_file=None):
+    """
+    For non‐NN models: load preprocessing pipeline and model separately.
+    For nn: load the bundled nn_model_with_threshold.pkl which contains
+    'preprocessing_pipeline', 'model_wrapper', and 'optimal_threshold'.
+    """
+    # load eval data
     X_eval, _ = load_data("data/eval.anon.csv", label_column="label")
-    
-     # Load the pre-trained pipeline from disk.
-    try:
-        preprocessing_pipeline = joblib.load(pipeline_file)
-        print(f"Loaded preprocessing pipeline from {pipeline_file}")
-    except Exception as e:
-        print(f"Failed to load preprocessing pipeline: {e}")
-        sys.exit(1)
 
-    X_eval_trans = preprocessing_pipeline.transform(X_eval)
-    
-    try:
-        model = joblib.load(model_file)
-        print(f"Loaded pre-trained model from {model_file}")
-    except Exception as e:
-        print(f"Failed to load the model from {model_file}: {e}")
-        sys.exit(1)
+    if model_type == "nn":
+        # the nn bundle includes both pipeline + wrapper + threshold
+        bundle = joblib.load(model_file)
+        preprocessing_pipeline = bundle["preprocessing_pipeline"]
+        model_wrapper         = bundle["model_wrapper"]
+        threshold             = bundle["optimal_threshold"]
 
-    if hasattr(model, 'predict_submission'):
-        eval_preds = model.predict_submission(X_eval_trans)
+        print(f"Loaded NN bundle from {model_file}")
+        X_eval_t = preprocessing_pipeline.transform(X_eval)
+
+        # get 0/1 predictions at the tuned threshold
+        eval_preds = model_wrapper.predict_submission(X_eval_t, threshold=threshold)
+
     else:
-        eval_preds = model.predict(X_eval_trans)
-    
+        # classic workflow: load pipeline then model
+        if pipeline_file is None:
+            print("Error: --pipeline_file must be specified for non‐NN models")
+            sys.exit(1)
+
+        preprocessing_pipeline = joblib.load(pipeline_file)
+        print(f"Loaded pipeline from {pipeline_file}")
+        X_eval_t = preprocessing_pipeline.transform(X_eval)
+
+        model = joblib.load(model_file)
+        print(f"Loaded model from {model_file}")
+
+        if hasattr(model, "predict_submission"):
+            eval_preds = model.predict_submission(X_eval_t)
+        else:
+            eval_preds = model.predict(X_eval_t)
+
+    # read eval IDs and write submission.csv
     eval_ids = pd.read_csv("data/eval.id", header=None, names=["example_id"])
     submission = pd.DataFrame({
         "example_id": eval_ids["example_id"],
         "label": eval_preds
     })
-    
-    submission.to_csv("output/submission.csv", index=False)
-    print("Submission file saved to output/submission.csv")
+    out_dir = Path("output")
+    out_dir.mkdir(exist_ok=True)
+    submission_path = out_dir / "submission.csv"
+    submission.to_csv(submission_path, index=False)
+    print(f"Submission saved to {submission_path}")
+
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate submission file using a pre-trained model.")
-    parser.add_argument('--model', type=str, default='dt', choices=['dt', 'perc', 'avgperc', 'marginperc', 'ensemble', 'adaboost', 'svm'],
-                        help="Select model type: 'dt', 'perc', 'avgperc', 'marginperc', or 'ensemble'")
-    parser.add_argument('--model_file', type=str, default=None,
-                        help="Path to the pre-trained model file. Defaults to output/best_model_{model}.pkl if not specified.")
-    parser.add_argument('--pipeline_file', type=str, default="output/preprocessing_pipeline.pkl",
-                        help="Path to the saved preprocessing pipeline file.")
+    parser = argparse.ArgumentParser(
+        description="Generate submission.csv from a tuned model."
+    )
+    parser.add_argument(
+        "--model", type=str, required=True,
+        choices=["dt","perc","avgperc","marginperc","ensemble","adaboost","svm","nn"],
+        help="Which model to use"
+    )
+    parser.add_argument(
+        "--model_file", type=str,
+        help="Path to tuned model file. "
+             "For nn use output/nn_model_with_threshold.pkl; "
+             "for others something like tuned_models/{model}_best_model_config.pkl"
+    )
+    parser.add_argument(
+        "--pipeline_file", type=str, default=None,
+        help="Preprocessing pipeline .pkl (not needed for nn)."
+    )
     args = parser.parse_args()
 
-    # If no model_file is provided, use a default based on the model type.
-    if args.model_file is None:
-        args.model_file = f"output/best_model_{args.model}.pkl"
-    
-    create_submission(args.model_file, args.pipeline_file)
+    if args.model == "nn":
+        if args.model_file is None:
+            args.model_file = "output/nn_model_with_threshold.pkl"
+    else:
+        if args.model_file is None:
+            args.model_file = f"tuned_models/{args.model}_best_model_config.pkl"
+        if args.pipeline_file is None:
+            args.pipeline_file = "output/preprocessing_pipeline.pkl"
 
-if __name__ == '__main__':
+    create_submission(args.model, args.model_file, args.pipeline_file)
+
+
+if __name__ == "__main__":
     main()

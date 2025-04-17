@@ -125,7 +125,7 @@ def build_model_nn(X, y, params):
     else:
         optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
 
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=5, factor=0.5, verbose=False) # verbose=False to reduce noise
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=5, factor=0.5) # verbose=False to reduce noise
 
 
     train_ds = torch.utils.data.TensorDataset(
@@ -144,7 +144,7 @@ def build_model_nn(X, y, params):
     best_state = None
     patience_counter = 0
 
-    print(f"Starting training for max {epochs} epochs...") 
+    #print(f"Starting training for max {epochs} epochs...") 
     for epoch in range(epochs):
         model.train() #e
         total_train_loss = 0.0
@@ -173,8 +173,8 @@ def build_model_nn(X, y, params):
         scheduler.step(avg_val_loss)
 
 
-        if (epoch + 1) % 10 == 0 or epoch == 0:
-             print(f"Epoch {epoch+1}/{epochs}.. Train Loss: {avg_train_loss:.4f}.. Val Loss: {avg_val_loss:.4f}.. LR: {current_lr:.1e}")
+        # if (epoch + 1) % 10 == 0 or epoch == 0:
+        #     print(f"Epoch {epoch+1}/{epochs}.. Train Loss: {avg_train_loss:.4f}.. Val Loss: {avg_val_loss:.4f}.. LR: {current_lr:.1e}")
 
         # early stopping
         if avg_val_loss < best_loss - 1e-4: # small delta to prevent trivial saves
@@ -185,12 +185,12 @@ def build_model_nn(X, y, params):
         else:
             patience_counter += 1
             if patience_counter >= max_no_improve:
-                print(f"Early stopping triggered at epoch {epoch + 1} after {max_no_improve} epochs with no improvement.")
+                #print(f"Early stopping triggered at epoch {epoch + 1} after {max_no_improve} epochs with no improvement.")
                 break
 
     # restore best model state
     if best_state is not None:
-        print(f"Restoring best model state with validation loss: {best_loss:.4f}")
+        #print(f"Restoring best model state with validation loss: {best_loss:.4f}")
         model.load_state_dict(best_state)
     else:
         print("Warning: No best model state found (early stopping patience might be too low or training too short). Using final model state.")

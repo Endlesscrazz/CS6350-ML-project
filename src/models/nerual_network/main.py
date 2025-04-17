@@ -1,4 +1,4 @@
-# --- START OF MODIFIED FILE models/nn/main.py ---
+# src/models/nerual_network/main.py
 
 import argparse
 import numpy as np
@@ -7,186 +7,155 @@ import joblib
 import os
 import sys
 import torch
-from sklearn.model_selection import train_test_split # Import train_test_split
+from sklearn.model_selection import train_test_split  # Import train_test_split
+from sklearn.base import clone
+import matplotlib.pyplot as plt
 
-# Add project src to sys.path
-project_root = Path(__file__).resolve().parents[2]
-sys.path.append(str(project_root))
+# ─── fix imports ────────────────────────────────────────────────────────────────
+# file is at: <repo>/src/models/nerual_network/main.py
+SRC_ROOT = Path(__file__).resolve().parents[2]   # <repo>/src
+REPO_ROOT = SRC_ROOT.parent                     # <repo>
+sys.path.insert(0, str(SRC_ROOT))               # add src to python path
+# ────────────────────────────────────────────────────────────────────────────────
 
 from common.data_loader import load_data
 from common.evaluation import compute_metrics
 from models.nerual_network.nn import build_model_nn, TorchWrapper
-from sklearn.base import clone
+
 
 def find_optimal_threshold(model_wrapper: TorchWrapper, X_val: np.ndarray, y_val_01: np.ndarray):
     """
     Finds the optimal prediction threshold on the validation set based on F1 score.
-
-    Args:
-        model_wrapper: Trained TorchWrapper instance.
-        X_val: Validation features.
-        y_val_01: Validation true labels in {0, 1} format.
-
-    Returns:
-        best_threshold: The threshold maximizing F1 score.
-        best_f1: The maximum F1 score achieved on the validation set.
     """
     print("\nFinding optimal threshold on validation set...")
     val_logits = model_wrapper.predict_logits(X_val)
 
-    best_f1 = -1
+    best_f1 = -1.0
     best_threshold = 0.0
-    # Define candidate thresholds - adjust range and number based on logit distribution if needed
-    thresholds = np.linspace(np.min(val_logits) - 1e-3, np.max(val_logits) + 1e-3, 200)
+    thresholds = np.linspace(val_logits.min() - 1e-3, val_logits.max() + 1e-3, 200)
 
     if len(np.unique(y_val_01)) < 2:
-        print("Warning: Validation set contains only one class. Cannot compute F1 score reliably.")
-        
+        print("Warning: Validation set contains only one class. Cannot compute F1 reliably.")
         return 0.0, 0.0
 
     f1_scores = []
-    for threshold in thresholds:
-        val_preds_01 = np.where(val_logits >= threshold, 1, 0)
-        # compute_metrics returns (precision, recall, f1)
-        _, _, f1 = compute_metrics(y_val_01, val_preds_01)
+    for t in thresholds:
+        preds = np.where(val_logits >= t, 1, 0)
+        _, _, f1 = compute_metrics(y_val_01, preds)
         f1_scores.append(f1)
         if f1 > best_f1:
-            best_f1 = f1
-            best_threshold = threshold
+            best_f1, best_threshold = f1, t
 
-    print(f"Optimal threshold found: {best_threshold:.4f} with Validation F1: {best_f1:.4f}")
+    print(f"Optimal threshold: {best_threshold:.4f} with F1: {best_f1:.4f}")
 
-    # DEBUG: Plot F1 vs Threshold
-    import matplotlib.pyplot as plt
+    # debug plot
     plt.figure()
     plt.plot(thresholds, f1_scores)
     plt.xlabel("Threshold")
     plt.ylabel("F1 Score")
-    plt.title("F1 Score vs. Prediction Threshold on Validation Set")
-    plt.axvline(best_threshold, color='r', linestyle='--', label=f'Best Threshold: {best_threshold:.2f}')
+    plt.title("F1 Score vs. Threshold")
+    plt.axvline(best_threshold, color='r', linestyle='--',
+                label=f"best={best_threshold:.2f}")
     plt.legend()
     plt.grid(True)
-    # plt.savefig(project_root / "output/nn_threshold_f1_plot.png") # Save the plot
-    # print(f"Saved threshold plot to {project_root / 'output/nn_threshold_f1_plot.png'}")
-
+    # plt.savefig(REPO_ROOT/"output"/"nn_threshold_f1.png")
     return best_threshold, best_f1
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Train Neural Network model, find optimal threshold, and evaluate.")
-    # Optional command-line overrides for scalar hyperparameters.
-    parser.add_argument('--lr', type=float, help="Learning rate (optional override).")
-    parser.add_argument('--epochs', type=int, help="Max epochs (optional override).")
-    parser.add_argument('--batch_size', type=int, help="Batch size (optional override).")
-    parser.add_argument('--dropout', type=float, help="Dropout rate (optional override).")
-    parser.add_argument('--weight_decay', type=float, help="Weight decay (optional override).")
-    parser.add_argument('--val_size', type=float, default=0.2, help="Proportion of training data for validation split to find threshold.")
+    parser = argparse.ArgumentParser(
+        description="Train NN, find threshold, evaluate & save."
+    )
+    parser.add_argument('--lr', type=float, help="override learning rate")
+    parser.add_argument('--epochs', type=int, help="override epochs")
+    parser.add_argument('--batch_size', type=int, help="override batch size")
+    parser.add_argument('--dropout', type=float, help="override dropout")
+    parser.add_argument('--weight_decay', type=float, help="override weight decay")
+    parser.add_argument('--val_size', type=float, default=0.2,
+                        help="validation split fraction")
     args = parser.parse_args()
 
+    # load tuned config
     model_type = "nn"
-    tuned_config_path = project_root / "tuned_models" / f"{model_type}_best_model_config.pkl"
-    output_dir = project_root / "output"
-    output_dir.mkdir(parents=True, exist_ok=True)
+    tuned_path = REPO_ROOT / "tuned_models" / f"{model_type}_best_model_config.pkl"
+    if not tuned_path.exists():
+        raise FileNotFoundError(
+            f"Tuned config not found at {tuned_path}. Run tune_models.py first."
+        )
+    print(f"Loading tuned config from {tuned_path}")
+    best_cfg = joblib.load(tuned_path)
+    pipeline_cfg = best_cfg["pipeline"]
+    hyperparams  = best_cfg["hyperparameters"]
+    print("Hyperparams:", hyperparams)
+    print("Pipeline:", pipeline_cfg)
 
-    if tuned_config_path.exists():
-        print(f"Loading tuned configuration from {tuned_config_path}")
-        best_config = joblib.load(tuned_config_path)
-        preprocessing_pipeline_config = best_config["pipeline"]
-        tuned_hyperparams = best_config["hyperparameters"]
-        print("Loaded hyperparameters:", tuned_hyperparams)
-        print("Loaded pipeline config:", preprocessing_pipeline_config)
-    else:
-        raise FileNotFoundError(f"Tuned configuration for model '{model_type}' not found at {tuned_config_path}. Please run tune_models.py first.")
+    # allow overrides
+    for k in ("lr","epochs","batch_size","dropout","weight_decay"):
+        v = getattr(args, k)
+        if v is not None:
+            hyperparams[k] = v
 
-    # Allow command-line overrides
-    if args.lr is not None: tuned_hyperparams["lr"] = args.lr
-    if args.epochs is not None: tuned_hyperparams["epochs"] = args.epochs
-    if args.batch_size is not None: tuned_hyperparams["batch_size"] = args.batch_size
-    if args.dropout is not None: tuned_hyperparams["dropout"] = args.dropout
-    if args.weight_decay is not None: tuned_hyperparams["weight_decay"] = args.weight_decay
+    # load data
+    X_train_full, y_train_full = load_data(REPO_ROOT/"data"/"train.csv",  label_column="label")
+    X_test,       y_test       = load_data(REPO_ROOT/"data"/"test.csv",   label_column="label")
 
-    # --- Load Data ---
-    X_train_orig, y_train_orig = load_data(project_root / "data/train.csv", label_column="label")
-    X_test_orig, y_test_orig = load_data(project_root / "data/test.csv", label_column="label")
+    # preprocess
+    preprocessing = clone(pipeline_cfg)
+    print("\nFitting pipeline on full training set…")
+    X_train_full_t = preprocessing.fit_transform(X_train_full)
+    X_test_t       = preprocessing.transform(X_test)
+    print("Train shape:", X_train_full_t.shape, "Test shape:", X_test_t.shape)
 
-    # --- Preprocessing ---
-    # Fit pipeline on the *entire* original training data
-    preprocessing_pipeline = clone(preprocessing_pipeline_config)
-    print("\nFitting preprocessing pipeline on full original training data...")
-    X_train_full_trans = preprocessing_pipeline.fit_transform(X_train_orig)
-    print("Transforming original test data...")
-    X_test_trans = preprocessing_pipeline.transform(X_test_orig)
-    print(f"Full training data shape after transform: {X_train_full_trans.shape}")
-    print(f"Test data shape after transform: {X_test_trans.shape}")
-
-    # --- Create Train/Validation Split for Threshold Finding ---
-    # Split the *transformed* full training data
-    # Use original labels ({0, 1}) for stratification here
-    # Use a fixed random state for this split if reproducibility is desired
-    split_seed = tuned_hyperparams.get("random_state", 42) + 10 # Use a different seed
-    print(f"\nSplitting transformed training data into train/validation ({1-args.val_size:.0%}/{args.val_size:.0%}) for model training and threshold tuning...")
-    X_train_fold, X_val_fold, y_train_fold_01, y_val_fold_01 = train_test_split(
-        X_train_full_trans,
-        y_train_orig, # Use original {0, 1} labels for stratify and later validation F1 calc
+    # split for threshold tuning
+    seed = hyperparams.get("random_state", 42) + 10
+    X_train, X_val, y_train01, y_val01 = train_test_split(
+        X_train_full_t, y_train_full,
         test_size=args.val_size,
-        stratify=y_train_orig,
-        random_state=split_seed
+        stratify=y_train_full,
+        random_state=seed
     )
-    print(f"Train fold shape: {X_train_fold.shape}, Validation fold shape: {X_val_fold.shape}")
 
-    # --- Convert Labels for NN Training ---
-    # build_model_nn expects y in {-1, 1}
-    y_train_fold_m1p1 = np.where(y_train_fold_01 == 0, -1, 1)
+    # convert labels for build_model_nn
+    y_train_m1p1 = np.where(y_train01 == 0, -1, 1)
+    hyperparams["random_state"] = seed + 1
 
-    # --- Build and Train Model on the Training Fold ---
-    # Pass the tuned hyperparameters
-    print("\nBuilding and training Neural Network model on the training fold...")
-    # Ensure random state is passed for internal early stopping split consistency if needed
-    tuned_hyperparams["random_state"] = split_seed + 1 # Ensure different seed for internal split
-    model_wrapper = build_model_nn(X_train_fold, y_train_fold_m1p1, tuned_hyperparams)
-    print("Model training complete.")
+    # train
+    print("\nTraining model…")
+    wrapper = build_model_nn(X_train, y_train_m1p1, hyperparams)
 
-    # --- Find Optimal Threshold on Validation Fold ---
-    optimal_threshold, val_f1 = find_optimal_threshold(model_wrapper, X_val_fold, y_val_fold_01)
+    # threshold
+    thr, val_f1 = find_optimal_threshold(wrapper, X_val, y_val01)
 
-    # --- Evaluation ---
-    # Evaluate on the training FOLD using the optimal threshold
-    print("\nEvaluating on training fold (used for actual training)...")
-    train_fold_preds_01 = model_wrapper.predict_submission(X_train_fold, threshold=optimal_threshold)
-    train_prec, train_rec, train_f1 = compute_metrics(y_train_fold_01, train_fold_preds_01)
-    print("Training Fold Metrics (using optimal threshold):")
-    print(f"Precision: {train_prec:.4f}, Recall: {train_rec:.4f}, F1-score: {train_f1:.4f}")
+    # eval on train fold
+    print("\nEvaluation on training fold:")
+    train_preds = wrapper.predict_submission(X_train, threshold=thr)
+    p_tr, r_tr, f_tr = compute_metrics(y_train01, train_preds)
+    print(f"  P {p_tr:.3f} R {r_tr:.3f} F1 {f_tr:.3f}")
 
-    # Evaluate on the validation FOLD using the optimal threshold (should match val_f1 found)
-    print("\nEvaluating on validation fold (used for threshold tuning)...")
-    val_fold_preds_01 = model_wrapper.predict_submission(X_val_fold, threshold=optimal_threshold)
-    val_prec, val_rec, val_f1_check = compute_metrics(y_val_fold_01, val_fold_preds_01)
-    print("Validation Fold Metrics (using optimal threshold):")
-    print(f"Precision: {val_prec:.4f}, Recall: {val_rec:.4f}, F1-score: {val_f1_check:.4f} (should approx match {val_f1:.4f})")
+    # eval on val fold
+    print("\nEvaluation on validation fold:")
+    val_preds = wrapper.predict_submission(X_val, threshold=thr)
+    p_v, r_v, f_v = compute_metrics(y_val01, val_preds)
+    print(f"  P {p_v:.3f} R {r_v:.3f} F1 {f_v:.3f}")
 
+    # eval on test set
+    print("\nEvaluation on test set:")
+    test_preds = wrapper.predict_submission(X_test_t, threshold=thr)
+    p_te, r_te, f_te = compute_metrics(y_test, test_preds)
+    print(f"  P {p_te:.3f} R {r_te:.3f} F1 {f_te:.3f}")
 
-    # Evaluate on the final TEST set using the optimal threshold
-    print("\nEvaluating on final test set...")
-    test_preds_01 = model_wrapper.predict_submission(X_test_trans, threshold=optimal_threshold)
-    test_prec, test_rec, test_f1 = compute_metrics(y_test_orig, test_preds_01)
-    print("Test Set Metrics (using optimal threshold):")
-    print(f"Precision: {test_prec:.4f}, Recall: {test_rec:.4f}, F1-score: {test_f1:.4f}")
-
-    # --- Save Model and Threshold ---
-    # Save the TorchWrapper object, the fitted pipeline, and the threshold
-    output_data = {
-        'model_wrapper': model_wrapper,
-        'preprocessing_pipeline': preprocessing_pipeline, # Already fitted on full train data
-        'optimal_threshold': optimal_threshold,
-        'val_f1_at_threshold': val_f1,
-        'test_f1_at_threshold': test_f1 # Store test F1 for reference
+    # save final model + pipeline + threshold
+    outdir = REPO_ROOT / "output"
+    outdir.mkdir(exist_ok=True)
+    save_obj = {
+        "model_wrapper": wrapper,
+        "preprocessing_pipeline": preprocessing,
+        "optimal_threshold": thr,
+        "val_f1": val_f1,
+        "test_f1": f_te,
     }
-    save_path = output_dir / 'nn_model_with_threshold.pkl'
-    joblib.dump(output_data, save_path)
-    print(f"\nModel wrapper, fitted pipeline, and optimal threshold saved to {save_path}")
-    print(f"(Optimal Threshold: {optimal_threshold:.4f})")
-
+    joblib.dump(save_obj, outdir/"nn_model_with_threshold.pkl")
+    print(f"\nSaved to {outdir/'nn_model_with_threshold.pkl'}")
 
 if __name__ == '__main__':
     main()
-

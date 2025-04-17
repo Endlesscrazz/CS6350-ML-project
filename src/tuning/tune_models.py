@@ -74,17 +74,16 @@ def main():
     # --- Reproducibility ---
     random.seed(args.seed)
     np.random.seed(args.seed)
-    # Note: torch seed is set within build_model_nn if random_state is passed
 
     # Load training data.
     X_train_orig, y_train_orig = load_data("data/train.csv", label_column="label")
 
     # --- Model Specific Setup ---
-    y_train = y_train_orig.copy() # Work on a copy
+    y_train = y_train_orig.copy() 
     stratified_cv = True # Default to stratified CV
 
-    if args.model in ['perc', 'avgperc', 'marginperc', 'adaboost', 'svm', 'nn']: # NN uses BCEWithLogitsLoss, needs 0/1 initially
-        y_train = np.where(y_train_orig == 0, -1, 1) # Convert to -1/1 for these models internally or for training logic
+    if args.model in ['perc', 'avgperc', 'marginperc', 'adaboost', 'svm', 'nn']: 
+        y_train = np.where(y_train_orig == 0, -1, 1) 
         # NN's build_model_nn handles conversion back to 0/1, so label_conversion is correct
         label_conversion = convert_neg1_to0 # Converts {-1, 1} back to {0, 1} for F1 score
     else: # dt
@@ -94,7 +93,7 @@ def main():
     if args.model == 'dt':
         hyperparam_grid = [
             {"max_depth": d, "min_samples_split": s}
-            for d in [5, 10, 15] # Slightly expanded
+            for d in [5, 10, 15] 
             for s in [2, 5, 10]
         ]
     elif args.model == 'perc':
@@ -118,7 +117,7 @@ def main():
             for mu in [0.5, 0.8, 1.0, 1.2] # Expanded mu
         ]
     elif args.model == "ensemble":
-        # Ensemble needs special handling later
+
         hyperparam_grid = [
              {
                 "dt_params": {"max_depth": d, "min_samples_split": s},
@@ -139,7 +138,7 @@ def main():
             {"n_estimators": n, "n_thresholds": t, "weak_learner_depth": d}
             for n in [20, 50, 100, 150] # Expanded estimators
             for t in [5, 10, 20]
-            for d in [1, 2, 3] # Added depth 1 (stumps)
+            for d in [1, 2, 3] 
         ]
     elif args.model == "svm":
          hyperparam_grid = [
