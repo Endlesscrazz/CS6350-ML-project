@@ -120,13 +120,13 @@ Run from the project root directory:
 python3 src/common/submission.py --model <MODEL>
 ```
 
-### File Descriptions
+## File Descriptions
 
-# src/tuning/tune_models.py
+### src/tuning/tune_models.py
 Searches over preprocessing pipelines and hyperparameters via cross‑validation, saves best config.
-# src/main.py
+### src/main.py
 Loads tuned config, refits preprocessing & model on full train set, tunes NN threshold if needed, saves artifacts.
-# src/common/submission.py
+### src/common/submission.py
 Loads pipeline + model (or NN bundle), transforms eval.anon.csv, writes output/submission.csv.
-# src/models/…
+### src/models/…
 Implements each algorithm; neural_network/nn.py defines a PyTorch MLP and wrapper.
