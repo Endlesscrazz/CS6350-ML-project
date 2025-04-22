@@ -1,0 +1,35 @@
+Final Project Report: ML Competition on Binary Classification
+
+(a) Project Overview:
+The project was centered around building a binary classification model for a machine learning competition. The goal was to design, implement, and evaluate models that predict binary labels (0 or 1) with high F1-score on a hidden test set. The competition setup required careful experimentation with data preprocessing, model selection, and hyperparameter tuning to maximize performance.
+
+(b) Important Ideas Explored:
+Throughout the project, I explored a wide range of machine learning models, including Decision Trees, various flavors of Perceptrons (Standard, Averaged, Margin), AdaBoost, Support Vector Machines (SVM), and Multi-Layer Perceptrons (Neural Networks). A key idea I focused on was developing a modular and generalizable code base to streamline training and evaluation across models. I also explored multiple preprocessing techniques such as log transforms, scaling (Standard, MinMax, Robust), PCA for dimensionality reduction, and imputation for handling missing or zero-heavy features. Early stopping, threshold optimization, and ensemble strategies were considered to improve performance.
+
+(c) Ideas from the Class Applied:
+I used many techniques and algorithms covered in class for this project. These include:
+
+	i)Decision tree construction using information gain
+
+	ii)Implementation of Perceptron and its variants
+
+	iii)Bagging and Boosting (specifically AdaBoost)
+
+	iv)SVM formulation with hinge loss
+
+	v)Cross-validation and hyperparameter tuning strategies(as previously implemented in homeworks)
+
+The understanding of bias-variance trade-off, generalization, and model robustness helped guide my choices during experimentation.
+
+(d) What I Learned:
+One key takeaway was how data preprocessing can significantly influence model performance, especially when dealing with sparse or zero-heavy datasets. I learned how to make preprocessing pipelines configurable and modular to support diverse model needs. I also learned how challenging it is to maintain clean and reusable code when testing many models with unique hyperparameter formats. This highlighted the importance of design patterns and abstraction in machine learning workflows. I further deepened my understanding of neural networks, particularly in tuning them with PyTorch, applying early stopping, and optimizing thresholds post-training.
+
+(e) Summary of Results:
+In Milestone 1, I established a baseline F1-score(0.84) using a simple Decision Tree model without applying any data preprocessing. In Milestone 2, I experimented with ensemble methods and more advanced models, which led to a slight improvement in my F1-score(0.86). However, the performance soon plateaued. Despite trying different models and training configurations, I encountered high training accuracy but low test accuracy, indicating that the models were overfitting and generalizing poorly.
+
+By revisiting concepts taught in class, I realized that effective data preprocessing was crucial. The dataset was highly imbalanced and contained several features with zero values that contributed little to learning. To address this, I incorporated techniques such as log transformation, variance thresholding, and proper feature scaling.
+
+Ultimately, the best-performing model was a Neural Network, which I extensively tuned using dropout, weight decay, and learning rate scheduling. After performing threshold tuning, the model achieved an F1-score of 0.916 on the validation set and 0.901 on the test set—substantially outperforming classical models like AdaBoost, which peaked at an F1-score of 0.86. These results highlight that, with careful tuning and preprocessing, neural networks can significantly outperform traditional models even on structured tabular data.
+
+(f) Future Work:
+If I had more time, I would experiment with deeper or wider neural network architectures and use advanced optimization techniques like cyclical learning rates. I would also try stacking or ensembling different models (e.g., Neural Networks + AdaBoost + SVM) to harness their complementary strengths. Incorporating feature engineering, domain-specific embeddings, and unsupervised pretraining techniques might further improve performance. Finally, automating the pipeline with tools like Optuna for hyperparameter optimization or MLFlow for tracking experiments would make the project more scalable and reproducible.
