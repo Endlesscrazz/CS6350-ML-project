@@ -78,6 +78,10 @@ This repository implements an end-to-end pipeline to detect malicious Android ap
     * `numpy`, `pandas`, `scikit-learn`, `joblib`
     * `torch` (PyTorch), `matplotlib`
 
+## If any libraries are not installed in CADE machines, You can install them via the requirements.tx
+```bash
+pip3 install requirements.txt
+```
 
 ## How to Run
 
