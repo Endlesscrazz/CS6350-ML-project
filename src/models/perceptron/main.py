@@ -5,7 +5,6 @@ import os
 import joblib
 from pathlib import Path
 
-# Add project root to sys.path to import common modules.
 project_root = Path(__file__).resolve().parents[2]
 sys.path.append(str(project_root))
 
@@ -64,7 +63,6 @@ def main():
     parser.add_argument('--decay_lr', type=bool, default=False, help="Decay learning rate (for standard perceptron).")
     args = parser.parse_args()
     
-    # Use the algorithm name to locate a tuned configuration.
     model_type = args.algo
     tuned_config_path = os.path.join("tuned_models", f"{model_type}_best_model_config.pkl")
     
@@ -78,8 +76,7 @@ def main():
         print(f"Tuned configuration for model '{model_type}' not found. Using default preprocessing.")
         preprocessing_pipeline = None
         tuned_hyperparams = {}
-    
-    # Override tuned hyperparameters with command-line parameters (if specified).
+
     if args.epochs is not None:
         tuned_hyperparams["epochs"] = args.epochs
     if args.lr is not None:
@@ -88,12 +85,10 @@ def main():
         tuned_hyperparams["mu"] = args.mu
     if args.algo == 'perc':
         tuned_hyperparams["decay_lr"] = args.decay_lr
-    
-    # Load full training and test data.
+
     X_train_full, y_train_full = load_data("data/train.csv", label_column="label")
     X_test, y_test = load_data("data/test.csv", label_column="label")
     
-    # Preprocess data.
     if preprocessing_pipeline is not None:
         # Use the tuned pipeline (assumed to implement fit_transform / transform)
         X_train_full_trans = preprocessing_pipeline.fit_transform(X_train_full)

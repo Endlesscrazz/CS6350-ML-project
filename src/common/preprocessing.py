@@ -23,14 +23,6 @@ pipeline_log_minmax = Pipeline([
     ('pca', PCA(n_components=50, random_state=42)),
 ])
 
-# Pipeline with no log transformation and RobustScaler.
-# pipeline_no_log = Pipeline([
-#     # No log transformation step.
-#     ('scaler', RobustScaler()),
-#     ('var_thresh', VarianceThreshold(threshold=1e-4)),
-#     ('pca', PCA(n_components=50, random_state=42)),
-# ])
-
 pipeline_scaled_only = Pipeline([
   ('scaler', StandardScaler()),
   ('var_thresh', VarianceThreshold(threshold=1e-4)),

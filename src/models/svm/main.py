@@ -52,7 +52,6 @@ def main():
     X_train_trans = preprocessing_pipeline.fit_transform(X_train)
     X_test_trans = preprocessing_pipeline.transform(X_test)
 
-    # Persist the used preprocessing pipeline.
     joblib.dump(preprocessing_pipeline, 'output/preprocessing_pipeline.pkl')
     print("Preprocessing pipeline saved to output/preprocessing_pipeline.pkl")
 
@@ -60,7 +59,6 @@ def main():
     y_train = np.where(y_train == 0, -1, 1)
     y_test = np.where(y_test == 0, -1, 1)
 
-    # Build the SVM model with the tuned hyperparameters.
     model = build_model_svm(X_train_trans, y_train, tuned_hyperparams)
 
     # Evaluate on training data.

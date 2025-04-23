@@ -3,7 +3,6 @@ import argparse
 from pathlib import Path
 import sys
 
-# Add the project src directory to sys.path so that "common" is found.
 project_src = Path(__file__).resolve().parents[2]
 sys.path.append(str(project_src))
 

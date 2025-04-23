@@ -8,7 +8,7 @@ import joblib
 import time
 
 from sklearn.model_selection import train_test_split
-# Add project src to sys.path so that common modules can be imported.
+
 project_root = Path(__file__).resolve().parents[2]
 sys.path.append(str(project_root))
 
