@@ -34,7 +34,12 @@ This repository implements an end-to-end pipeline to detect malicious Android ap
 │   │   │   ├── decision_tree.py
 │   │   │   └── main.py
 │   │   ├── perceptron/
-│   │   │   └── ... # (Assuming similar structure for perceptron)
+|   |   |   ├── _init_.py
+│   │   │   ├── averaged.py
+│   │   │   └── main.py
+│   │   │   ├── builders.py
+│   │   │   ├── margin.py
+│   │   │   └── standard.py
 │   │   ├── ensemble/
 │   │   │   ├── builders.py
 │   │   │   ├── ensemble_dt_perc.py
@@ -78,7 +83,7 @@ This repository implements an end-to-end pipeline to detect malicious Android ap
     * `numpy`, `pandas`, `scikit-learn`, `joblib`
     * `torch` (PyTorch), `matplotlib`
 
-## If any libraries are not installed in CADE machines, You can install them via the requirements.tx
+## If any libraries are not installed in CADE machines, You can install them via the requirements.txt
 ```bash
 pip3 install requirements.txt
 ```

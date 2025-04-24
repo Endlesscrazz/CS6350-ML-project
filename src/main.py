@@ -69,7 +69,7 @@ def main():
                  if hasattr(model,'predict_submission')
                  else model.predict(X_test_t))
         
-        preds_array = np.array(preds_raw) # Ensure it's a numpy array
+        preds_array = np.array(preds_raw) 
         print(f"Debug: Unique raw predictions: {np.unique(preds_array)}") #  debug print
         preds_binary = np.where(preds_array <= 0, 0, 1)
         print(f"Debug: Unique binary predictions: {np.unique(preds_binary)}") #  debug print
