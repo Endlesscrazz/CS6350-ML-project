@@ -33,25 +33,30 @@ This repository implements an end-to-end pipeline to detect malicious Android ap
 │   │   │   ├── builders.py
 │   │   │   ├── decision_tree.py
 │   │   │   └── main.py
+│   │   │
 │   │   ├── perceptron/
-|   |   |   ├── _init_.py
+│   │   │   ├── __init__.py
 │   │   │   ├── averaged.py
-│   │   │   └── main.py
 │   │   │   ├── builders.py
 │   │   │   ├── margin.py
-│   │   │   └── standard.py
+│   │   │   ├── standard.py
+│   │   │   └── main.py
+│   │   │
 │   │   ├── ensemble/
 │   │   │   ├── builders.py
 │   │   │   ├── ensemble_dt_perc.py
 │   │   │   └── main.py
+│   │   │
 │   │   ├── adaboost/
 │   │   │   ├── builders.py
 │   │   │   ├── adaboost.py
 │   │   │   └── main.py
+│   │   │
 │   │   ├── svm/
 │   │   │   ├── builders.py
 │   │   │   ├── svm.py
 │   │   │   └── main.py
+│   │   │
 │   │   └── neural_network/
 │   │       ├── nn.py
 │   │       └── main.py
@@ -68,8 +73,8 @@ This repository implements an end-to-end pipeline to detect malicious Android ap
 │   └── ...
 │
 ├── output/
-│   ├── preprocessing_pipeline.pkl # Or model-specific pipelines
-│   ├── dt_model.pkl               # Or model-specific models
+│   ├── preprocessing_pipeline.pkl        # Or model-specific pipelines
+│   ├── dt_model.pkl                      # Or model-specific models
 │   ├── nn_model_with_threshold.pkl
 │   ├── submission.csv
 │   └── ...
